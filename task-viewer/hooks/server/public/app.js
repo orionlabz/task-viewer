@@ -2,271 +2,13 @@
 let ws = null;
 let reconnectDelay = 1000;
 const MAX_RECONNECT = 30000;
+let allColumns = { backlog: [], todo: [], in_progress: [], done: [] };
 let currentSessionId = null;
-let currentClaudeTasks = []; // claude code tasks
+let activeComponents = new Set();
+let sessionFilter = false;
 
-// === DOM refs ===
-const $ = (id) => document.getElementById(id);
-const banner = $('connection-banner');
-const statusDot = $('status-dot');
-const sessionIdEl = $('session-id');
-const kanbanEl = $('kanban');
-const kanbanNoSession = $('kanban-no-session');
-const kanbanNoTasks = $('kanban-no-tasks');
-const historyEmpty = $('history-empty');
-const historyList = $('history-list');
-
-// === WebSocket ===
-function connect() {
-  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(`${protocol}//${location.host}`);
-
-  ws.onopen = () => {
-    reconnectDelay = 1000;
-    banner.classList.add('hidden');
-    statusDot.className = 'status-dot online';
-  };
-
-  ws.onclose = () => {
-    statusDot.className = 'status-dot offline';
-    banner.classList.remove('hidden');
-    setTimeout(connect, reconnectDelay);
-    reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT);
-  };
-
-  ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data);
-    switch (msg.type) {
-      case 'tasks:update': handleTasks(msg.data); break;
-      case 'session:change': handleSessionChange(msg.data); break;
-      case 'heartbeat': break;
-    }
-  };
-}
-
-// === Task Handlers ===
-function handleTasks({ tasks, sessionId }) {
-  currentSessionId = sessionId;
-  currentClaudeTasks = tasks || [];
-  sessionIdEl.textContent = sessionId
-    ? `Session: ${sessionId.slice(0, 8)}...`
-    : 'No active session';
-  refreshKanban();
-}
-
-function handleSessionChange({ sessionId }) {
-  currentSessionId = sessionId;
-  sessionIdEl.textContent = `Session: ${sessionId.slice(0, 8)}...`;
-}
-
-function refreshKanban() {
-  if (currentClaudeTasks.length === 0) {
-    kanbanNoSession.classList.add('hidden');
-    kanbanNoTasks.classList.remove('hidden');
-    kanbanEl.classList.add('hidden');
-    return;
-  }
-
-  kanbanNoSession.classList.add('hidden');
-  kanbanNoTasks.classList.add('hidden');
-  kanbanEl.classList.remove('hidden');
-  renderKanban(currentClaudeTasks);
-}
-
-// === Kanban Renderer ===
-function renderKanban(tasks) {
-  const groups = { pending: [], in_progress: [], completed: [] };
-  for (const task of tasks) {
-    if (groups[task.status]) groups[task.status].push(task);
-  }
-
-  for (const [status, items] of Object.entries(groups)) {
-    const col = $(`col-${status}`);
-    const count = $(`count-${status}`);
-    count.textContent = items.length;
-    col.innerHTML = '';
-    for (const task of items) {
-      col.appendChild(createTaskCard(task, status));
-    }
-  }
-}
-
-function createTaskCard(task, status) {
-  const card = document.createElement('div');
-  card.className = `task-card ${status === 'in_progress' ? 'in-progress' : status}`;
-
-  let html = `
-    <div class="task-card-header">
-      <span class="task-subject">${esc(task.subject)}</span>
-      <span class="task-id">#${task.id}</span>
-    </div>`;
-
-  if (task.description) {
-    html += `<div class="task-desc">${esc(task.description)}</div>`;
-  }
-
-  if (status === 'in_progress' && task.activeForm) {
-    html += `<span class="task-active-form">${esc(task.activeForm)}</span>`;
-  }
-
-  const deps = [];
-  if (task.blocks?.length) deps.push(`blocks: ${task.blocks.map(b => '#' + b).join(', ')}`);
-  if (task.blockedBy?.length) deps.push(`blocked by: ${task.blockedBy.map(b => '#' + b).join(', ')}`);
-  if (deps.length) {
-    html += `<div class="task-deps">${deps.join(' | ')}</div>`;
-  }
-
-  // Detail panel (hidden by default)
-  html += `<div class="task-detail hidden" data-detail>`;
-  html += `<div class="task-detail-label">Status</div>`;
-  html += `<div class="task-detail-value"><span class="task-detail-status ${task.status}">${task.status.replace('_', ' ')}</span></div>`;
-
-  if (task.description) {
-    html += `<div class="task-detail-label">Description</div>`;
-    html += `<div class="task-detail-value">${esc(task.description)}</div>`;
-  }
-  if (task.activeForm) {
-    html += `<div class="task-detail-label">Active Form</div>`;
-    html += `<div class="task-detail-value">${esc(task.activeForm)}</div>`;
-  }
-  if (task.blocks?.length) {
-    html += `<div class="task-detail-label">Blocks</div>`;
-    html += `<div class="task-detail-value">${task.blocks.map(b => '#' + b).join(', ')}</div>`;
-  }
-  if (task.blockedBy?.length) {
-    html += `<div class="task-detail-label">Blocked By</div>`;
-    html += `<div class="task-detail-value">${task.blockedBy.map(b => '#' + b).join(', ')}</div>`;
-  }
-  if (task.owner) {
-    html += `<div class="task-detail-label">Owner</div>`;
-    html += `<div class="task-detail-value">${esc(task.owner)}</div>`;
-  }
-  if (task.metadata && typeof task.metadata === 'object' && Object.keys(task.metadata).length > 0) {
-    html += `<div class="task-detail-label">Metadata</div>`;
-    html += `<div class="task-metadata">`;
-    for (const [key, value] of Object.entries(task.metadata)) {
-      html += `<span class="task-meta-tag"><span class="task-meta-key">${esc(key)}</span>${esc(String(value))}</span>`;
-    }
-    html += `</div>`;
-  }
-
-  html += `</div>`;
-
-  card.innerHTML = html;
-
-  // Click to expand/collapse
-  card.addEventListener('click', () => {
-    const detail = card.querySelector('[data-detail]');
-    const isExpanded = card.classList.contains('expanded');
-    // Collapse all other cards
-    document.querySelectorAll('.task-card.expanded').forEach(c => {
-      if (c !== card) {
-        c.classList.remove('expanded');
-        c.querySelector('[data-detail]')?.classList.add('hidden');
-      }
-    });
-    card.classList.toggle('expanded', !isExpanded);
-    detail.classList.toggle('hidden', isExpanded);
-  });
-
-  return card;
-}
-
-// === History ===
-async function loadHistory() {
-  try {
-    const res = await fetch('/api/sessions');
-    const sessions = await res.json();
-    renderHistory(sessions);
-  } catch { /* ignore */ }
-}
-
-function renderHistory(sessions) {
-  if (!sessions || sessions.length === 0) {
-    historyEmpty.classList.remove('hidden');
-    historyList.classList.add('hidden');
-    return;
-  }
-
-  historyEmpty.classList.add('hidden');
-  historyList.classList.remove('hidden');
-  historyList.innerHTML = '';
-
-  for (const session of sessions) {
-    if (session.sessionId === currentSessionId) continue;
-
-    const item = document.createElement('div');
-    item.className = 'history-item';
-
-    const date = session.startedAt
-      ? new Date(session.startedAt).toLocaleString()
-      : 'Unknown date';
-
-    const summaryHtml = session.summary
-      ? `<div class="history-summary">${esc(session.summary)}</div>`
-      : '';
-
-    item.innerHTML = `
-      <div class="history-header" onclick="toggleHistory(this, '${session.sessionId}')">
-        <div>
-          <span class="history-chevron">&#9656;</span>
-          <span class="history-date">${date}</span>
-          <span class="history-task-count">${session.taskCount} tasks</span>
-        </div>
-        <span class="history-meta">${session.sessionId.slice(0, 8)}...</span>
-      </div>
-      ${summaryHtml}
-      <div class="history-body hidden" id="history-${session.sessionId}"></div>`;
-
-    historyList.appendChild(item);
-  }
-}
-
-async function toggleHistory(header, sessionId) {
-  const chevron = header.querySelector('.history-chevron');
-  const body = $(`history-${sessionId}`);
-  const isOpen = !body.classList.contains('hidden');
-
-  if (isOpen) {
-    body.classList.add('hidden');
-    chevron.classList.remove('open');
-    return;
-  }
-
-  chevron.classList.add('open');
-  body.classList.remove('hidden');
-
-  if (!body.dataset.loaded) {
-    body.innerHTML = '<p style="color: var(--muted); font-size: 12px; padding: 8px;">Loading...</p>';
-    try {
-      const res = await fetch(`/api/sessions/${sessionId}`);
-      const session = await res.json();
-      const tasks = session.tasks || [];
-      body.innerHTML = renderHistoryKanban(tasks);
-      body.dataset.loaded = 'true';
-    } catch {
-      body.innerHTML = '<p style="color: var(--destructive); font-size: 12px;">Failed to load</p>';
-    }
-  }
-}
-window.toggleHistory = toggleHistory;
-
-function renderHistoryKanban(tasks) {
-  const groups = { pending: [], in_progress: [], completed: [] };
-  for (const task of tasks) {
-    if (groups[task.status]) groups[task.status].push(task);
-  }
-
-  let html = '<div class="history-kanban">';
-  for (const [status, items] of Object.entries(groups)) {
-    const label = status.replace('_', ' ');
-    html += `<div>
-      <div class="history-col-title">${label} (${items.length})</div>
-      ${items.map(t => `<div class="history-task">${esc(t.subject)}</div>`).join('')}
-    </div>`;
-  }
-  return html + '</div>';
-}
+// === DOM ===
+const $ = id => document.getElementById(id);
 
 // === Helpers ===
 function esc(str) {
@@ -276,31 +18,215 @@ function esc(str) {
   return el.innerHTML;
 }
 
-// === Theme Toggle ===
+function shortSession(id) {
+  return id ? id.slice(0, 8) + '…' : '—';
+}
+
+// === WebSocket ===
+function connect() {
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${protocol}//${location.host}`);
+
+  ws.onopen = () => {
+    reconnectDelay = 1000;
+    $('connection-banner').classList.add('hidden');
+    $('status-dot').className = 'status-dot online';
+  };
+
+  ws.onclose = () => {
+    $('status-dot').className = 'status-dot';
+    $('connection-banner').classList.remove('hidden');
+    setTimeout(connect, reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT);
+  };
+
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'kanban:update') handleKanbanUpdate(msg.data.columns);
+    if (msg.type === 'session:change') handleSessionChange(msg.data);
+  };
+}
+
+// === Handlers ===
+function handleSessionChange({ sessionId }) {
+  currentSessionId = sessionId;
+  $('session-id').textContent = 'Session: ' + shortSession(sessionId);
+}
+
+function handleKanbanUpdate(columns) {
+  allColumns = columns;
+  updateComponentFilters(columns);
+  renderBoard();
+}
+
+// === Filters ===
+function updateComponentFilters(columns) {
+  const allTasks = [...(columns.backlog||[]), ...(columns.todo||[]), ...(columns.in_progress||[]), ...(columns.done||[])];
+  const components = [...new Set(allTasks.map(t => t.component).filter(Boolean))].sort();
+
+  const container = $('component-filters');
+  const existing = new Set([...container.querySelectorAll('.component-chip')].map(c => c.dataset.comp));
+  const updated = new Set(components);
+
+  // Add new chips
+  for (const comp of components) {
+    if (!existing.has(comp)) {
+      const chip = document.createElement('button');
+      chip.className = 'component-chip' + (activeComponents.has(comp) ? ' active' : '');
+      chip.dataset.comp = comp;
+      chip.textContent = comp;
+      chip.addEventListener('click', () => toggleComponent(comp, chip));
+      container.appendChild(chip);
+    }
+  }
+  // Remove stale chips
+  for (const chip of container.querySelectorAll('.component-chip')) {
+    if (!updated.has(chip.dataset.comp)) chip.remove();
+  }
+}
+
+function toggleComponent(comp, chipEl) {
+  if (activeComponents.has(comp)) {
+    activeComponents.delete(comp);
+    chipEl.classList.remove('active');
+  } else {
+    activeComponents.add(comp);
+    chipEl.classList.add('active');
+  }
+  renderBoard();
+}
+
+function filterTasks(tasks) {
+  let result = tasks;
+  if (sessionFilter && currentSessionId) {
+    result = result.filter(t => t.sessionId === currentSessionId);
+  }
+  if (activeComponents.size > 0) {
+    result = result.filter(t => activeComponents.has(t.component));
+  }
+  return result;
+}
+
+// === Board Rendering ===
+function renderBoard() {
+  const cols = ['backlog', 'todo', 'in_progress', 'done'];
+  for (const col of cols) {
+    const tasks = filterTasks(allColumns[col] || []);
+    $('count-' + col).textContent = tasks.length;
+    renderColumn(col, tasks);
+  }
+}
+
+function renderColumn(col, tasks) {
+  const body = $('cards-' + col);
+  body.innerHTML = '';
+  if (tasks.length === 0) {
+    body.innerHTML = '<div class="empty-state">No tasks here</div>';
+    return;
+  }
+  for (const task of tasks) {
+    body.appendChild(createCard(task));
+  }
+}
+
+function createCard(task) {
+  const card = document.createElement('div');
+  card.className = 'task-card';
+
+  const priorityClass = task.priority ? 'priority-' + task.priority : '';
+  const priorityHtml = task.priority
+    ? `<span class="priority-badge ${priorityClass}">${esc(task.priority)}</span>`
+    : '';
+  const componentHtml = task.component
+    ? `<span class="component-tag">${esc(task.component)}</span>`
+    : '';
+  const effortHtml = task.effort
+    ? `<span class="effort-chip">${esc(task.effort)}</span>`
+    : '';
+
+  card.innerHTML = `
+    <div class="card-header">
+      <span class="card-subject">${esc(task.subject)}</span>
+      <span class="card-id">#${esc(task.id)}</span>
+    </div>
+    ${(task.priority || task.component || task.effort) ? `<div class="card-meta">${priorityHtml}${componentHtml}${effortHtml}</div>` : ''}
+    <div class="card-detail hidden">
+      ${task.description ? `<div class="detail-field"><span class="detail-label">Description</span><span class="detail-value">${esc(task.description)}</span></div>` : ''}
+      ${task.activeForm ? `<div class="detail-field"><span class="detail-label">Active</span><span class="active-form">${esc(task.activeForm)}</span></div>` : ''}
+      ${task.metadata?.feature ? `<div class="detail-field"><span class="detail-label">Feature</span><span class="detail-value">${esc(task.metadata.feature)}</span></div>` : ''}
+      ${task.tags?.length ? `<div class="detail-field"><span class="detail-label">Tags</span><span class="detail-value">${task.tags.map(t => esc(t)).join(', ')}</span></div>` : ''}
+      <div class="detail-field"><span class="detail-label">Session</span><span class="detail-value" style="font-family:monospace;font-size:11px">${shortSession(task.sessionId)}</span></div>
+      <div class="detail-field"><span class="detail-label">Updated</span><span class="detail-value">${task.updatedAt ? new Date(task.updatedAt + ' UTC').toLocaleString() : '—'}</span></div>
+    </div>
+  `;
+
+  card.addEventListener('click', () => {
+    const detail = card.querySelector('.card-detail');
+    const expanded = !detail.classList.contains('hidden');
+    detail.classList.toggle('hidden', expanded);
+    card.classList.toggle('expanded', !expanded);
+  });
+
+  return card;
+}
+
+// === Init ===
+async function loadInitialState() {
+  try {
+    // Load project info
+    const health = await fetch('/api/health').then(r => r.json());
+    const name = health.projectCwd ? health.projectCwd.split('/').pop() : '—';
+    $('project-name').textContent = name;
+
+    // Load kanban data
+    const columns = await fetch('/api/kanban').then(r => r.json());
+    handleKanbanUpdate(columns);
+  } catch { /* server may not be ready yet */ }
+}
+
+// === Done column collapse ===
+function initDoneCollapse() {
+  const header = $('done-header');
+  const body = $('cards-done');
+  const col = $('col-done');
+
+  header.addEventListener('click', () => {
+    const isCollapsed = col.classList.contains('collapsed');
+    col.classList.toggle('collapsed', !isCollapsed);
+    body.classList.toggle('hidden', !isCollapsed);
+    header.setAttribute('aria-expanded', String(isCollapsed));
+  });
+
+  header.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); header.click(); }
+  });
+}
+
+// === Session filter toggle ===
+$('current-session-only').addEventListener('change', e => {
+  sessionFilter = e.target.checked;
+  renderBoard();
+});
+
+// === Theme ===
 function initTheme() {
   const saved = localStorage.getItem('task-viewer-theme');
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  if (saved === 'dark' || (!saved && prefersDark)) {
-    document.body.classList.add('dark');
-  }
+  if (saved === 'dark' || (!saved && prefersDark)) document.body.classList.add('dark');
   updateThemeIcon();
 }
-
-function toggleTheme() {
-  document.body.classList.toggle('dark');
-  const isDark = document.body.classList.contains('dark');
-  localStorage.setItem('task-viewer-theme', isDark ? 'dark' : 'light');
-  updateThemeIcon();
-}
-
 function updateThemeIcon() {
   const btn = $('theme-toggle');
-  if (btn) btn.textContent = document.body.classList.contains('dark') ? '\u2600' : '\u263E';
+  if (btn) btn.textContent = document.body.classList.contains('dark') ? '☀' : '☽';
 }
+$('theme-toggle').addEventListener('click', () => {
+  document.body.classList.toggle('dark');
+  localStorage.setItem('task-viewer-theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+  updateThemeIcon();
+});
 
-$('theme-toggle')?.addEventListener('click', toggleTheme);
-
-// === Init ===
+// === Boot ===
 initTheme();
+initDoneCollapse();
 connect();
-loadHistory();
+loadInitialState();
