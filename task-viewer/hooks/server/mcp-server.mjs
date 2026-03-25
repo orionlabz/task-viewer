@@ -9,6 +9,8 @@ import {
   moveTask,
   getDashboard,
   listKanban,
+  insertTaskEvent,
+  upsertProjectSession,
 } from './storage.mjs';
 
 // Get projectCwd from the running Express server
@@ -107,6 +109,31 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ['tasks'],
       },
     },
+    {
+      name: 'task_annotate',
+      description: 'Add a note to a task on behalf of Claude. Use to record observations, decisions, or progress during task execution.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          taskId:    { type: 'string', description: 'Task ID (e.g. "7")' },
+          sessionId: { type: 'string', description: 'Session ID of the task' },
+          note:      { type: 'string', description: 'The note to add (2-3 sentences max)' },
+        },
+        required: ['taskId', 'sessionId', 'note'],
+      },
+    },
+    {
+      name: 'session_summarize',
+      description: 'Record a summary of this session in the project timeline. Call at the end of a session to log what was accomplished.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          summary:         { type: 'string', description: '1-2 sentence summary of session work' },
+          tasksCompleted:  { type: 'number', description: 'Number of tasks moved to done this session', default: 0 },
+        },
+        required: ['summary'],
+      },
+    },
   ],
 }));
 
@@ -162,6 +189,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
       fetch('http://localhost:37778/api/kanban-notify', { method: 'POST' }).catch(() => {});
       return { content: [{ type: 'text', text: JSON.stringify(results) }] };
+    }
+
+    if (name === 'task_annotate') {
+      const { taskId, sessionId, note } = args;
+      if (!taskId || !sessionId || !note?.trim()) {
+        return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: 'taskId, sessionId and note required' }) }] };
+      }
+      const event = insertTaskEvent(taskId, sessionId, 'claude_note', { text: note.trim(), tool: 'task_annotate' });
+      return { content: [{ type: 'text', text: JSON.stringify({ ok: true, eventId: event.id }) }] };
+    }
+
+    if (name === 'session_summarize') {
+      const { summary, tasksCompleted = 0 } = args;
+      if (!summary?.trim()) {
+        return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: 'summary required' }) }] };
+      }
+      const sessionId = process.env.CLAUDE_SESSION_ID || `session-${Date.now()}`;
+      const projectCwd = process.env.PROJECT_CWD || process.cwd();
+      upsertProjectSession(sessionId, projectCwd, summary.trim(), tasksCompleted);
+      return { content: [{ type: 'text', text: JSON.stringify({ ok: true, sessionId }) }] };
     }
 
     return {
