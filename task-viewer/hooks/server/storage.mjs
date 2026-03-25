@@ -73,6 +73,28 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS task_events (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id    TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    type       TEXT NOT NULL,
+    content    TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_task_events_task ON task_events(task_id, session_id);
+
+  CREATE TABLE IF NOT EXISTS project_sessions (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id       TEXT NOT NULL UNIQUE,
+    project_cwd      TEXT NOT NULL DEFAULT '',
+    summary          TEXT NOT NULL,
+    tasks_completed  INTEGER NOT NULL DEFAULT 0,
+    created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_project_sessions_cwd ON project_sessions(project_cwd);
+`);
+
 // --- Prepared statements ---
 const stmts = {
   upsertSession: db.prepare(`
@@ -141,6 +163,40 @@ const stmts = {
       metadata = COALESCE(NULLIF(@metadata, ''), metadata),
       updated_at = datetime('now')
     WHERE id = @id AND session_id = @sessionId
+  `),
+
+  insertEvent: db.prepare(`
+    INSERT INTO task_events (task_id, session_id, type, content)
+    VALUES (@taskId, @sessionId, @type, @content)
+  `),
+
+  getTaskEvents: db.prepare(`
+    SELECT id, task_id, session_id, type, content, created_at
+    FROM task_events
+    WHERE task_id = @taskId AND session_id = @sessionId
+    ORDER BY created_at ASC
+  `),
+
+  getLastEventStatus: db.prepare(`
+    SELECT content FROM task_events
+    WHERE task_id = @taskId AND session_id = @sessionId AND type = 'status_change'
+    ORDER BY created_at DESC LIMIT 1
+  `),
+
+  upsertProjectSession: db.prepare(`
+    INSERT INTO project_sessions (session_id, project_cwd, summary, tasks_completed)
+    VALUES (@sessionId, @projectCwd, @summary, @tasksCompleted)
+    ON CONFLICT(session_id) DO UPDATE SET
+      summary          = excluded.summary,
+      tasks_completed  = excluded.tasks_completed
+  `),
+
+  getProjectTimeline: db.prepare(`
+    SELECT session_id, summary, tasks_completed, created_at
+    FROM project_sessions
+    WHERE project_cwd = ?
+    ORDER BY created_at DESC
+    LIMIT 20
   `),
 };
 
@@ -359,4 +415,42 @@ export function getDashboard(projectCwd) {
       byPriority,
     },
   };
+}
+
+export function insertTaskEvent(taskId, sessionId, type, content) {
+  const result = stmts.insertEvent.run({
+    taskId,
+    sessionId,
+    type,
+    content: typeof content === 'string' ? content : JSON.stringify(content),
+  });
+  return { id: result.lastInsertRowid };
+}
+
+export function getTaskEvents(taskId, sessionId) {
+  return stmts.getTaskEvents.all({ taskId, sessionId }).map(row => ({
+    id: row.id,
+    type: row.type,
+    content: (() => { try { return JSON.parse(row.content); } catch { return { text: row.content }; } })(),
+    createdAt: row.created_at,
+  }));
+}
+
+export function upsertProjectSession(sessionId, projectCwd, summary, tasksCompleted) {
+  stmts.upsertProjectSession.run({ sessionId, projectCwd: projectCwd || '', summary, tasksCompleted: tasksCompleted || 0 });
+}
+
+export function getProjectTimeline(projectCwd) {
+  return stmts.getProjectTimeline.all(projectCwd).map(row => ({
+    sessionId: row.session_id,
+    summary: row.summary,
+    tasksCompleted: row.tasks_completed,
+    createdAt: row.created_at,
+  }));
+}
+
+export function getLastStatusEvent(taskId, sessionId) {
+  const row = stmts.getLastEventStatus.get({ taskId, sessionId });
+  if (!row) return null;
+  try { return JSON.parse(row.content); } catch { return null; }
 }
