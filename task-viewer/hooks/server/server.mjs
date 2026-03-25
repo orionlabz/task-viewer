@@ -3,6 +3,9 @@ import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { execSync } from 'node:child_process';
 import { WatcherManager } from './watchers.mjs';
 import {
   upsertSession,
@@ -15,6 +18,11 @@ import {
   moveTask,
   getDashboard,
   finalizeSession,
+  insertTaskEvent,
+  getTaskEvents,
+  getLastStatusEvent,
+  upsertProjectSession,
+  getProjectTimeline,
 } from './storage.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -25,7 +33,9 @@ const app = express();
 app.use(express.json());
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', projectCwd: PROJECT_CWD, port: PORT });
+  let branch = '—';
+  try { branch = execSync('git -C . rev-parse --abbrev-ref HEAD', { cwd: PROJECT_CWD, timeout: 2000 }).toString().trim(); } catch {}
+  res.json({ status: 'ok', projectCwd: PROJECT_CWD, port: PORT, branch });
 });
 
 app.use(express.static(join(__dirname, 'public')));
@@ -47,6 +57,14 @@ app.post('/api/tasks', (req, res) => {
 
     // Upsert the task
     upsertTask(sessionId, { id: taskId, subject, description, status, activeForm, kanban_column });
+
+    // Auto emit status_change event
+    if (status) {
+      const last = getLastStatusEvent(taskId, sessionId);
+      if (!last || last.to !== status) {
+        insertTaskEvent(taskId, sessionId, 'status_change', { from: last?.to || null, to: status });
+      }
+    }
 
     // Broadcast updated kanban
     const columns = listKanban(PROJECT_CWD);
@@ -119,6 +137,105 @@ app.get('/api/sessions/:sessionId', (req, res) => {
   } catch (err) {
     console.error('GET /api/sessions/:id error:', err);
     res.status(500).json({ error: 'failed to load session' });
+  }
+});
+
+app.get('/api/tasks/:id/events', (req, res) => {
+  try {
+    const { sessionId } = req.query;
+    if (!sessionId) return res.status(400).json({ error: 'sessionId query param required' });
+    const events = getTaskEvents(req.params.id, sessionId);
+    res.json(events);
+  } catch (err) {
+    console.error('GET /api/tasks/:id/events error:', err);
+    res.status(500).json({ error: 'failed to load events' });
+  }
+});
+
+app.post('/api/tasks/:id/notes', (req, res) => {
+  try {
+    const { sessionId, text } = req.body || {};
+    if (!sessionId || !text?.trim()) return res.status(400).json({ error: 'sessionId and text required' });
+    const event = insertTaskEvent(req.params.id, sessionId, 'user_note', { text: text.trim() });
+    res.json({ ok: true, eventId: event.id });
+  } catch (err) {
+    console.error('POST /api/tasks/:id/notes error:', err);
+    res.status(500).json({ error: 'failed to save note' });
+  }
+});
+
+app.post('/api/events/tool-call', (req, res) => {
+  try {
+    const { taskId, sessionId, tool, inputSummary } = req.body || {};
+    if (!taskId || !sessionId || !tool) return res.status(400).json({ error: 'taskId, sessionId and tool required' });
+    insertTaskEvent(taskId, sessionId, 'tool_call', { tool, input_summary: inputSummary || '' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'failed to record tool call' });
+  }
+});
+
+app.get('/api/project/timeline', (_req, res) => {
+  try {
+    const timeline = getProjectTimeline(PROJECT_CWD);
+    res.json(timeline);
+  } catch (err) {
+    console.error('GET /api/project/timeline error:', err);
+    res.status(500).json({ error: 'failed to load timeline' });
+  }
+});
+
+app.patch('/api/tasks/:id/steps', (req, res) => {
+  try {
+    const { sessionId, index, checked } = req.body || {};
+    if (sessionId === undefined || index === undefined || checked === undefined) {
+      return res.status(400).json({ error: 'sessionId, index and checked required' });
+    }
+    const tasks = getSessionTasks(sessionId);
+    const task = tasks.find(t => t.id === req.params.id);
+    if (!task) return res.status(404).json({ error: 'task not found' });
+
+    const description = task.description || '';
+    const lines = description.split('\n');
+    let stepIdx = 0;
+    const updated = lines.map(line => {
+      const isStep = /^- \[[ x]\] /.test(line);
+      if (!isStep) return line;
+      if (stepIdx === index) {
+        stepIdx++;
+        return checked ? line.replace(/^- \[ \] /, '- [x] ') : line.replace(/^- \[x\] /, '- [ ] ');
+      }
+      stepIdx++;
+      return line;
+    });
+    const newDescription = updated.join('\n');
+
+    // Update DB via upsertTask — COALESCE preserves other fields, non-empty description will save
+    upsertTask(sessionId, {
+      id: req.params.id,
+      subject: task.subject,
+      description: newDescription,
+      status: task.status,
+      activeForm: task.activeForm,
+      kanban_column: task.kanbanColumn,
+      priority: task.priority,
+      effort: task.effort,
+      component: task.component,
+      tags: task.tags,
+    });
+
+    // Write back to source task file so file-watcher re-sync preserves the toggle
+    const taskFilePath = `${homedir()}/.claude/tasks/${sessionId}/${req.params.id}.json`;
+    if (existsSync(taskFilePath)) {
+      const taskFile = JSON.parse(readFileSync(taskFilePath, 'utf8'));
+      taskFile.description = newDescription;
+      writeFileSync(taskFilePath, JSON.stringify(taskFile, null, 2));
+    }
+
+    res.json({ ok: true, description: newDescription });
+  } catch (err) {
+    console.error('PATCH /api/tasks/:id/steps error:', err);
+    res.status(500).json({ error: 'failed to toggle step' });
   }
 });
 
