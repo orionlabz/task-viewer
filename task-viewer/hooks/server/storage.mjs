@@ -131,13 +131,6 @@ const stmts = {
     ORDER BY t.updated_at DESC
   `),
 
-  kanbanByProject: db.prepare(`
-    SELECT t.*, s.project_cwd FROM tasks t
-    JOIN sessions s ON s.id = t.session_id
-    WHERE s.project_cwd = ?
-    ORDER BY t.updated_at DESC
-  `),
-
   enrichTask: db.prepare(`
     UPDATE tasks SET
       kanban_column = COALESCE(NULLIF(@kanbanColumn, ''), kanban_column),
@@ -283,7 +276,7 @@ export function finalizeSession(id, summary, projectCwd) {
 }
 
 export function listKanban(projectCwd) {
-  const rows = stmts.kanbanByProject.all(projectCwd);
+  const rows = stmts.allProjectTasks.all(projectCwd);
   const columns = { backlog: [], todo: [], in_progress: [], done: [] };
 
   for (const row of rows) {
@@ -328,10 +321,13 @@ export function enrichTask(taskId, sessionId, fields) {
 }
 
 export function moveTask(taskId, sessionId, column) {
-  db.prepare(`
+  const VALID_COLUMNS = new Set(['backlog', 'todo', 'in_progress', 'done']);
+  if (!VALID_COLUMNS.has(column)) throw new Error(`Invalid kanban column: "${column}". Valid values: backlog, todo, in_progress, done`);
+  const result = db.prepare(`
     UPDATE tasks SET kanban_column = ?, updated_at = datetime('now')
     WHERE id = ? AND session_id = ?
   `).run(column, taskId, sessionId);
+  if (result.changes === 0) return null;
   return getSessionTasks(sessionId).find(t => t.id === taskId) || null;
 }
 
