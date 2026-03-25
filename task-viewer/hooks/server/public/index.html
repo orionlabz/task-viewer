@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Viewer — Claude Code</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Aleo:wght@400;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="connection-banner" class="connection-banner hidden">
+    <span class="connection-dot"></span>
+    <span>Reconnecting...</span>
+  </div>
+
+  <header class="header">
+    <div class="header-left">
+      <h1 class="header-title">Aurora Task Viewer</h1>
+      <span class="header-subtitle">Siderea Academy</span>
+    </div>
+    <div class="header-right">
+      <span id="session-id" class="session-id">No active session</span>
+      <span id="status-dot" class="status-dot offline"></span>
+    </div>
+  </header>
+
+  <main class="main">
+    <section id="kanban-section" class="section">
+      <h2 class="section-title">Active Session</h2>
+      <div id="kanban-no-session" class="empty-state">
+        <p>Waiting for Claude Code session...</p>
+      </div>
+      <div id="kanban-no-tasks" class="empty-state hidden">
+        <p>No tasks yet — Claude will create them as it works</p>
+      </div>
+      <div id="kanban" class="kanban hidden">
+        <div class="kanban-column">
+          <div class="column-header">
+            <span class="column-title">Pending</span>
+            <span id="count-pending" class="column-count">0</span>
+          </div>
+          <div id="col-pending" class="column-cards"></div>
+        </div>
+        <div class="kanban-column">
+          <div class="column-header">
+            <span class="column-title">In Progress</span>
+            <span id="count-in_progress" class="column-count">0</span>
+          </div>
+          <div id="col-in_progress" class="column-cards"></div>
+        </div>
+        <div class="kanban-column">
+          <div class="column-header">
+            <span class="column-title">Completed</span>
+            <span id="count-completed" class="column-count">0</span>
+          </div>
+          <div id="col-completed" class="column-cards"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="specs-section" class="section hidden">
+      <h2 class="section-title">Specs & Plans</h2>
+      <div id="specs-list" class="specs-list"></div>
+    </section>
+
+    <section id="history-section" class="section">
+      <h2 class="section-title">Session History</h2>
+      <div id="history-empty" class="empty-state">
+        <p>No previous sessions found</p>
+      </div>
+      <div id="history-list" class="history-list hidden"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
