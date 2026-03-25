@@ -194,7 +194,7 @@ const stmts = {
   getProjectTimeline: db.prepare(`
     SELECT session_id, summary, tasks_completed, created_at
     FROM project_sessions
-    WHERE project_cwd = ?
+    WHERE project_cwd = @projectCwd
     ORDER BY created_at DESC
     LIMIT 20
   `),
@@ -437,11 +437,11 @@ export function getTaskEvents(taskId, sessionId) {
 }
 
 export function upsertProjectSession(sessionId, projectCwd, summary, tasksCompleted) {
-  stmts.upsertProjectSession.run({ sessionId, projectCwd: projectCwd || '', summary, tasksCompleted: tasksCompleted || 0 });
+  stmts.upsertProjectSession.run({ sessionId, projectCwd: projectCwd || '', summary: summary || '', tasksCompleted: tasksCompleted || 0 });
 }
 
 export function getProjectTimeline(projectCwd) {
-  return stmts.getProjectTimeline.all(projectCwd).map(row => ({
+  return stmts.getProjectTimeline.all({ projectCwd }).map(row => ({
     sessionId: row.session_id,
     summary: row.summary,
     tasksCompleted: row.tasks_completed,
