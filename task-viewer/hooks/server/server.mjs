@@ -4,15 +4,14 @@ import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { WatcherManager } from './watchers.mjs';
-import { discoverProjectSessions, loadSessionTasks } from './parsers.mjs';
+import { discoverProjectSessions } from './parsers.mjs';
 import {
-  updateSessionClaudeMem,
-  updateTaskClaudeMem,
-  finalizeSession,
+  upsertSession,
+  upsertTask,
+  getSession,
+  getSessionTasks,
   listSessions,
-  readSession,
-  updateSessionTasks,
-  getOrCreateSession,
+  finalizeSession,
 } from './storage.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -23,46 +22,40 @@ const app = express();
 app.use(express.json());
 app.use(express.static(join(__dirname, 'public')));
 
-// --- Session persistence & claude-mem endpoints ---
-
-app.post('/api/session-context', async (req, res) => {
-  try {
-    const { sessionId, projectCwd, claudeMem } = req.body;
-    if (!sessionId) return res.status(400).json({ error: 'sessionId required' });
-    const session = await updateSessionClaudeMem(sessionId, projectCwd, claudeMem);
-    broadcast('claudemem:update', { sessionId, claudeMem });
-    res.json({ ok: true, session });
-  } catch (err) {
-    console.error('POST /api/session-context error:', err);
-    res.status(500).json({ error: 'failed to update session context' });
-  }
+// Explicit index route — serve-static 1.16.x doesn't auto-resolve / to index.html
+app.get('/', (_req, res) => {
+  res.sendFile(join(__dirname, 'public', 'index.html'));
 });
 
-app.post('/api/session-context/task', async (req, res) => {
+// --- Session persistence & task endpoints ---
+
+app.post('/api/tasks', (req, res) => {
   try {
-    const { sessionId, taskId, claudeMem } = req.body;
+    const { sessionId, taskId, toolName, subject, description, status, activeForm } = req.body;
     if (!sessionId || !taskId) return res.status(400).json({ error: 'sessionId and taskId required' });
-    const session = await updateTaskClaudeMem(sessionId, taskId, claudeMem);
-    if (!session) return res.status(404).json({ error: 'session not found' });
-    broadcast('claudemem:update', { sessionId, taskId, claudeMem });
-    res.json({ ok: true, session });
+
+    // Auto-create session if needed
+    upsertSession(sessionId, PROJECT_CWD);
+
+    // Upsert the task
+    upsertTask(sessionId, { id: taskId, subject, description, status, activeForm });
+
+    // Broadcast updated task list
+    const tasks = getSessionTasks(sessionId);
+    broadcast('tasks:update', { tasks, sessionId });
+
+    res.json({ ok: true });
   } catch (err) {
-    console.error('POST /api/session-context/task error:', err);
-    res.status(500).json({ error: 'failed to update task context' });
+    console.error('POST /api/tasks error:', err);
+    res.status(500).json({ error: 'failed to sync task' });
   }
 });
 
-app.post('/api/session-context/finalize', async (req, res) => {
+app.post('/api/session-context/finalize', (req, res) => {
   try {
     const { sessionId, summary } = req.body || {};
-    const sid = sessionId || watchers.activeSessionId;
-    if (!sid) return res.status(400).json({ error: 'no active session to finalize' });
-    // Snapshot current tasks before finalizing
-    const tasks = await loadSessionTasks(sid);
-    if (tasks.length > 0) {
-      await updateSessionTasks(sid, tasks, PROJECT_CWD);
-    }
-    const session = await finalizeSession(sid, summary || null);
+    const session = finalizeSession(sessionId, summary, PROJECT_CWD);
+    if (!session) return res.status(400).json({ error: 'no session to finalize' });
     res.json({ ok: true, session });
   } catch (err) {
     console.error('POST /api/session-context/finalize error:', err);
@@ -70,38 +63,21 @@ app.post('/api/session-context/finalize', async (req, res) => {
   }
 });
 
-app.get('/api/sessions', async (req, res) => {
+app.get('/api/sessions', (_req, res) => {
   try {
-    const nativeSessions = await discoverProjectSessions(PROJECT_CWD);
-    const enrichedSessions = await listSessions();
-    const enrichedMap = new Map();
-    for (const s of enrichedSessions) enrichedMap.set(s.sessionId, s);
-
-    const merged = nativeSessions.map(ns => {
-      const enriched = enrichedMap.get(ns.sessionId);
-      return {
-        ...ns,
-        summary: enriched?.summary || null,
-        endedAt: enriched?.endedAt || null,
-        hasClaudeMem: !!(enriched?.claudeMem?.timeline?.length || enriched?.claudeMem?.observations?.length),
-      };
-    });
-    res.json(merged);
+    const sessions = listSessions(PROJECT_CWD);
+    res.json(sessions);
   } catch (err) {
     console.error('GET /api/sessions error:', err);
     res.status(500).json({ error: 'failed to list sessions' });
   }
 });
 
-app.get('/api/sessions/:sessionId', async (req, res) => {
+app.get('/api/sessions/:sessionId', (req, res) => {
   try {
-    const enriched = await readSession(req.params.sessionId);
-    if (!enriched) {
-      // Fallback: load from native tasks
-      const tasks = await loadSessionTasks(req.params.sessionId);
-      return res.json({ sessionId: req.params.sessionId, tasks, claudeMem: null });
-    }
-    res.json(enriched);
+    const session = getSession(req.params.sessionId);
+    if (!session) return res.status(404).json({ error: 'session not found' });
+    res.json(session);
   } catch (err) {
     console.error('GET /api/sessions/:id error:', err);
     res.status(500).json({ error: 'failed to load session' });
@@ -153,16 +129,11 @@ watchers.start().catch(err => {
 
 async function shutdown() {
   console.log('Shutting down Task Viewer...');
-  // Persist final task state
   if (watchers.activeSessionId) {
     try {
-      const tasks = await loadSessionTasks(watchers.activeSessionId);
-      if (tasks.length > 0) {
-        await updateSessionTasks(watchers.activeSessionId, tasks, PROJECT_CWD);
-      }
-      await finalizeSession(watchers.activeSessionId, null);
+      finalizeSession(watchers.activeSessionId, null, PROJECT_CWD);
     } catch (err) {
-      console.error('Failed to persist final state:', err);
+      console.error('Failed to finalize session on shutdown:', err);
     }
   }
   watchers.close().then(() => {
