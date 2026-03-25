@@ -48,6 +48,30 @@ if (!columns.includes('owner')) {
 if (!columns.includes('metadata')) {
   db.exec(`ALTER TABLE tasks ADD COLUMN metadata TEXT`);
 }
+if (!columns.includes('kanban_column')) {
+  db.exec(`ALTER TABLE tasks ADD COLUMN kanban_column TEXT NOT NULL DEFAULT 'backlog'`);
+  db.exec(`UPDATE tasks SET kanban_column = 'in_progress' WHERE status = 'in_progress'`);
+  db.exec(`UPDATE tasks SET kanban_column = 'done' WHERE status = 'completed'`);
+}
+if (!columns.includes('priority')) {
+  db.exec(`ALTER TABLE tasks ADD COLUMN priority TEXT`);
+}
+if (!columns.includes('effort')) {
+  db.exec(`ALTER TABLE tasks ADD COLUMN effort TEXT`);
+}
+if (!columns.includes('component')) {
+  db.exec(`ALTER TABLE tasks ADD COLUMN component TEXT`);
+}
+if (!columns.includes('tags')) {
+  db.exec(`ALTER TABLE tasks ADD COLUMN tags TEXT`);
+}
+
+// Indexes for new columns
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_tasks_kanban ON tasks(kanban_column);
+  CREATE INDEX IF NOT EXISTS idx_tasks_component ON tasks(component);
+  CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
+`);
 
 // --- Prepared statements ---
 const stmts = {
@@ -59,8 +83,8 @@ const stmts = {
   `),
 
   upsertTask: db.prepare(`
-    INSERT INTO tasks (id, session_id, subject, description, status, active_form, owner, blocks, blocked_by, metadata, updated_at)
-    VALUES (@id, @sessionId, @subject, @description, @status, @activeForm, @owner, @blocks, @blockedBy, @metadata, datetime('now'))
+    INSERT INTO tasks (id, session_id, subject, description, status, active_form, owner, blocks, blocked_by, metadata, kanban_column, priority, effort, component, tags, updated_at)
+    VALUES (@id, @sessionId, @subject, @description, @status, @activeForm, @owner, @blocks, @blockedBy, @metadata, @kanbanColumn, @priority, @effort, @component, @tags, datetime('now'))
     ON CONFLICT(id, session_id) DO UPDATE SET
       subject = COALESCE(NULLIF(excluded.subject, ''), tasks.subject),
       description = COALESCE(NULLIF(excluded.description, ''), tasks.description),
@@ -70,6 +94,11 @@ const stmts = {
       blocks = COALESCE(NULLIF(excluded.blocks, ''), tasks.blocks),
       blocked_by = COALESCE(NULLIF(excluded.blocked_by, ''), tasks.blocked_by),
       metadata = COALESCE(NULLIF(excluded.metadata, ''), tasks.metadata),
+      kanban_column = COALESCE(NULLIF(excluded.kanban_column, ''), tasks.kanban_column),
+      priority = COALESCE(NULLIF(excluded.priority, ''), tasks.priority),
+      effort = COALESCE(NULLIF(excluded.effort, ''), tasks.effort),
+      component = COALESCE(NULLIF(excluded.component, ''), tasks.component),
+      tags = COALESCE(NULLIF(excluded.tags, ''), tasks.tags),
       updated_at = datetime('now')
   `),
 
@@ -94,6 +123,32 @@ const stmts = {
   latestSession: db.prepare(`
     SELECT id FROM sessions WHERE project_cwd = ? ORDER BY started_at DESC LIMIT 1
   `),
+
+  allProjectTasks: db.prepare(`
+    SELECT t.*, s.project_cwd FROM tasks t
+    JOIN sessions s ON s.id = t.session_id
+    WHERE s.project_cwd = ?
+    ORDER BY t.updated_at DESC
+  `),
+
+  kanbanByProject: db.prepare(`
+    SELECT t.*, s.project_cwd FROM tasks t
+    JOIN sessions s ON s.id = t.session_id
+    WHERE s.project_cwd = ?
+    ORDER BY t.updated_at DESC
+  `),
+
+  enrichTask: db.prepare(`
+    UPDATE tasks SET
+      kanban_column = COALESCE(NULLIF(@kanbanColumn, ''), kanban_column),
+      priority = COALESCE(NULLIF(@priority, ''), priority),
+      effort = COALESCE(NULLIF(@effort, ''), effort),
+      component = COALESCE(NULLIF(@component, ''), component),
+      tags = COALESCE(NULLIF(@tags, ''), tags),
+      metadata = COALESCE(NULLIF(@metadata, ''), metadata),
+      updated_at = datetime('now')
+    WHERE id = @id AND session_id = @sessionId
+  `),
 };
 
 // --- Public API ---
@@ -115,6 +170,11 @@ export function upsertTask(sessionId, taskData) {
     blocks: taskData.blocks ? JSON.stringify(taskData.blocks) : '',
     blockedBy: taskData.blockedBy ? JSON.stringify(taskData.blockedBy) : '',
     metadata: taskData.metadata ? JSON.stringify(taskData.metadata) : '',
+    kanbanColumn: taskData.kanban_column || '',
+    priority: taskData.priority || '',
+    effort: taskData.effort || '',
+    component: taskData.component || '',
+    tags: taskData.tags ? JSON.stringify(taskData.tags) : '',
   });
 }
 
@@ -132,6 +192,11 @@ export function getSessionTasks(sessionId) {
     subject: row.subject,
     description: row.description,
     status: row.status,
+    kanbanColumn: row.kanban_column || 'backlog',
+    priority: row.priority || null,
+    effort: row.effort || null,
+    component: row.component || null,
+    tags: row.tags ? JSON.parse(row.tags) : [],
     activeForm: row.active_form,
     owner: row.owner || null,
     blocks: row.blocks ? JSON.parse(row.blocks) : [],
@@ -154,6 +219,58 @@ export function listSessions(projectCwd) {
   }));
 }
 
+export function listFeatures(projectCwd) {
+  const rows = stmts.allProjectTasks.all(projectCwd);
+  const features = new Map();
+
+  for (const row of rows) {
+    const meta = row.metadata ? JSON.parse(row.metadata) : null;
+    const featureName = meta?.feature || null;
+    const task = {
+      id: row.id,
+      subject: row.subject,
+      description: row.description,
+      status: row.status,
+      activeForm: row.active_form,
+      owner: row.owner || null,
+      blocks: row.blocks ? JSON.parse(row.blocks) : [],
+      blockedBy: row.blocked_by ? JSON.parse(row.blocked_by) : [],
+      metadata: meta,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      sessionId: row.session_id,
+    };
+
+    if (!features.has(featureName)) {
+      features.set(featureName, { name: featureName, tasks: [] });
+    }
+    features.get(featureName).tasks.push(task);
+  }
+
+  // Compute progress for each feature
+  const result = [];
+  for (const [, feature] of features) {
+    const total = feature.tasks.length;
+    const completed = feature.tasks.filter(t => t.status === 'completed').length;
+    const inProgress = feature.tasks.filter(t => t.status === 'in_progress').length;
+    const status = completed === total ? 'completed'
+      : inProgress > 0 || completed > 0 ? 'in_progress'
+      : 'pending';
+    result.push({ ...feature, total, completed, inProgress, status });
+  }
+
+  // Named features first (sorted by most recent update), ungrouped last
+  result.sort((a, b) => {
+    if (a.name === null && b.name !== null) return 1;
+    if (a.name !== null && b.name === null) return -1;
+    // By status: in_progress first, then pending, then completed
+    const statusOrder = { in_progress: 0, pending: 1, completed: 2 };
+    return (statusOrder[a.status] ?? 1) - (statusOrder[b.status] ?? 1);
+  });
+
+  return result;
+}
+
 export function finalizeSession(id, summary, projectCwd) {
   let sessionId = id;
   if (!sessionId && projectCwd) {
@@ -163,4 +280,87 @@ export function finalizeSession(id, summary, projectCwd) {
   if (!sessionId) return null;
   stmts.finalizeSession.run({ id: sessionId, summary: summary || null });
   return stmts.getSession.get(sessionId);
+}
+
+export function listKanban(projectCwd) {
+  const rows = stmts.kanbanByProject.all(projectCwd);
+  const columns = { backlog: [], todo: [], in_progress: [], done: [] };
+
+  for (const row of rows) {
+    const col = row.kanban_column || 'backlog';
+    if (!columns[col]) columns[col] = [];
+    columns[col].push({
+      id: row.id,
+      subject: row.subject,
+      description: row.description,
+      status: row.status,
+      kanbanColumn: row.kanban_column,
+      priority: row.priority || null,
+      effort: row.effort || null,
+      component: row.component || null,
+      tags: row.tags ? JSON.parse(row.tags) : [],
+      activeForm: row.active_form,
+      owner: row.owner || null,
+      blocks: row.blocks ? JSON.parse(row.blocks) : [],
+      blockedBy: row.blocked_by ? JSON.parse(row.blocked_by) : [],
+      metadata: row.metadata ? JSON.parse(row.metadata) : null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      sessionId: row.session_id,
+    });
+  }
+
+  return columns;
+}
+
+export function enrichTask(taskId, sessionId, fields) {
+  stmts.enrichTask.run({
+    id: taskId,
+    sessionId,
+    kanbanColumn: fields.kanban_column || '',
+    priority: fields.priority || '',
+    effort: fields.effort || '',
+    component: fields.component || '',
+    tags: fields.tags ? JSON.stringify(fields.tags) : '',
+    metadata: fields.metadata ? JSON.stringify(fields.metadata) : '',
+  });
+  return stmts.getSession.get(sessionId) ? getSessionTasks(sessionId).find(t => t.id === taskId) : null;
+}
+
+export function moveTask(taskId, sessionId, column) {
+  db.prepare(`
+    UPDATE tasks SET kanban_column = ?, updated_at = datetime('now')
+    WHERE id = ? AND session_id = ?
+  `).run(column, taskId, sessionId);
+  return getSessionTasks(sessionId).find(t => t.id === taskId) || null;
+}
+
+export function getDashboard(projectCwd) {
+  const columns = listKanban(projectCwd);
+  const allTasks = [...columns.backlog, ...columns.todo, ...columns.in_progress, ...columns.done];
+  const total = allTasks.length;
+  const completed = columns.done.length;
+
+  const byComponent = {};
+  const byPriority = {};
+  for (const t of allTasks) {
+    if (t.component) byComponent[t.component] = (byComponent[t.component] || 0) + 1;
+    if (t.priority) byPriority[t.priority] = (byPriority[t.priority] || 0) + 1;
+  }
+
+  return {
+    projectCwd,
+    columns: {
+      backlog: { count: columns.backlog.length, tasks: columns.backlog },
+      todo: { count: columns.todo.length, tasks: columns.todo },
+      in_progress: { count: columns.in_progress.length, tasks: columns.in_progress },
+      done: { count: columns.done.length, tasks: columns.done },
+    },
+    metrics: {
+      totalTasks: total,
+      completionRate: total > 0 ? Math.round((completed / total) * 100) / 100 : 0,
+      byComponent,
+      byPriority,
+    },
+  };
 }
