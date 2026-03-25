@@ -121,7 +121,45 @@ function createTaskCard(task, status) {
     html += `<div class="task-deps">${deps.join(' | ')}</div>`;
   }
 
+  // Detail panel (hidden by default)
+  html += `<div class="task-detail hidden" data-detail>`;
+  html += `<div class="task-detail-label">Status</div>`;
+  html += `<div class="task-detail-value"><span class="task-detail-status ${task.status}">${task.status.replace('_', ' ')}</span></div>`;
+  if (task.description) {
+    html += `<div class="task-detail-label">Full Description</div>`;
+    html += `<div class="task-detail-value">${esc(task.description)}</div>`;
+  }
+  if (task.activeForm) {
+    html += `<div class="task-detail-label">Active Form</div>`;
+    html += `<div class="task-detail-value">${esc(task.activeForm)}</div>`;
+  }
+  if (task.blocks?.length) {
+    html += `<div class="task-detail-label">Blocks</div>`;
+    html += `<div class="task-detail-value">${task.blocks.map(b => '#' + b).join(', ')}</div>`;
+  }
+  if (task.blockedBy?.length) {
+    html += `<div class="task-detail-label">Blocked By</div>`;
+    html += `<div class="task-detail-value">${task.blockedBy.map(b => '#' + b).join(', ')}</div>`;
+  }
+  html += `</div>`;
+
   card.innerHTML = html;
+
+  // Click to expand/collapse
+  card.addEventListener('click', () => {
+    const detail = card.querySelector('[data-detail]');
+    const isExpanded = card.classList.contains('expanded');
+    // Collapse all other cards
+    document.querySelectorAll('.task-card.expanded').forEach(c => {
+      if (c !== card) {
+        c.classList.remove('expanded');
+        c.querySelector('[data-detail]')?.classList.add('hidden');
+      }
+    });
+    card.classList.toggle('expanded', !isExpanded);
+    detail.classList.toggle('hidden', isExpanded);
+  });
+
   return card;
 }
 
