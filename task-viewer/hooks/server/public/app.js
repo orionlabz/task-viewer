@@ -331,6 +331,31 @@ function esc(str) {
   return el.innerHTML;
 }
 
+// === Theme Toggle ===
+function initTheme() {
+  const saved = localStorage.getItem('task-viewer-theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  if (saved === 'dark' || (!saved && prefersDark)) {
+    document.body.classList.add('dark');
+  }
+  updateThemeIcon();
+}
+
+function toggleTheme() {
+  document.body.classList.toggle('dark');
+  const isDark = document.body.classList.contains('dark');
+  localStorage.setItem('task-viewer-theme', isDark ? 'dark' : 'light');
+  updateThemeIcon();
+}
+
+function updateThemeIcon() {
+  const btn = $('theme-toggle');
+  if (btn) btn.textContent = document.body.classList.contains('dark') ? '\u2600' : '\u263E';
+}
+
+$('theme-toggle')?.addEventListener('click', toggleTheme);
+
 // === Init ===
+initTheme();
 connect();
 loadHistory();
