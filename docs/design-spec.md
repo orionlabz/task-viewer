@@ -5,9 +5,9 @@
 **Goal:** Criar um plugin do Claude Code que visualiza a execucao de tasks e planos em tempo real atraves de um dashboard web Kanban, iniciando automaticamente com o Claude Code e encerrando ao sair.
 
 **Plugin Name:** `task-viewer`
-**Marketplace:** `orionlabz/superpower-kanban` (GitHub repo)
-**Repo:** `git@github.com:orionlabz/superpower-kanban.git`
-**Dev local:** `~/.claude/plugins/marketplaces/paulojalowyj/`
+**Marketplace:** `orionlabz/task-viewer` (GitHub repo)
+**Repo:** `git@github.com:orionlabz/task-viewer.git`
+**Dev local:** `~/.claude/plugins/marketplaces/orionlabz/`
 **Port:** `localhost:37778`
 
 **Tech Stack:** Node.js, Express, WebSocket (`ws`), chokidar, vanilla HTML/CSS/JS
@@ -17,7 +17,7 @@
 ## 1. Estrutura do Plugin
 
 ```
-~/.claude/plugins/marketplaces/paulojalowyj/
+~/.claude/plugins/marketplaces/orionlabz/
 ├── marketplace.json
 └── task-viewer/
     ├── .claude-plugin/
@@ -312,7 +312,7 @@ Skill de diagnostico e acesso rapido:
 
 ```json
 {
-  "name": "superpower-kanban",
+  "name": "task-viewer",
   "description": "Real-time task visualization plugins for Claude Code",
   "owner": {
     "name": "OrionLabz"
@@ -382,10 +382,10 @@ echo -n "$PWD" | if command -v md5 >/dev/null 2>&1; then md5 -q; else md5sum | c
 
 ### Repositorio
 
-- **GitHub:** `git@github.com:orionlabz/superpower-kanban.git`
+- **GitHub:** `git@github.com:orionlabz/task-viewer.git`
 - **Estrutura do repo:**
   ```
-  superpower-kanban/
+  task-viewer/
   ├── marketplace.json          # Manifesto do marketplace
   ├── task-viewer/              # Plugin
   │   ├── .claude-plugin/
@@ -401,10 +401,10 @@ echo -n "$PWD" | if command -v md5 >/dev/null 2>&1; then md5 -q; else md5sum | c
 
 ```bash
 # Adicionar o marketplace
-claude plugins add-marketplace orionlabz/superpower-kanban
+claude plugins add-marketplace orionlabz/task-viewer
 
 # Instalar o plugin
-claude plugins add task-viewer --marketplace orionlabz/superpower-kanban
+claude plugins add task-viewer --marketplace orionlabz/task-viewer
 ```
 
 ### O que acontece automaticamente apos instalar

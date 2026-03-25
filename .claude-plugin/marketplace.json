@@ -1,0 +1,20 @@
+{
+  "name": "orionlabz",
+  "metadata": {
+    "description": "Real-time task visualization plugins for Claude Code"
+  },
+  "owner": {
+    "name": "OrionLabz"
+  },
+  "plugins": [
+    {
+      "name": "task-viewer",
+      "description": "Real-time Kanban dashboard for Claude Code sessions with plan tracking and claude-mem integration",
+      "version": "0.2.0",
+      "source": "./task-viewer",
+      "author": {
+        "name": "OrionLabz"
+      }
+    }
+  ]
+}

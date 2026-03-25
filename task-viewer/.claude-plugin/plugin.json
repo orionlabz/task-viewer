@@ -1,4 +1,4 @@
 {
   "name": "task-viewer",
-  "description": "Real-time Kanban dashboard that visualizes Claude Code tasks and Superpowers plans. Auto-starts with sessions on localhost:37778."
+  "description": "Real-time Kanban dashboard that visualizes Claude Code tasks, plans, and claude-mem context. Auto-starts with sessions on localhost:37778."
 }

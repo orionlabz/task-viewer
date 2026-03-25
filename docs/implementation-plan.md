@@ -8,13 +8,13 @@
 
 **Tech Stack:** Node.js, Express 4, ws 8, chokidar 4, open 10, vanilla HTML/CSS/JS
 
-**Spec:** `~/.claude/plugins/marketplaces/paulojalowyj/docs/design-spec.md`
+**Spec:** `~/.claude/plugins/marketplaces/orionlabz/docs/design-spec.md`
 
 **Desvios intencionais do spec:**
 - Specs e plans sao enviados juntos num unico evento `specs:update` (linked tree) ao inves de eventos separados `specs:update` + `plans:update`
 - Historico usa REST endpoints (`/api/history`) ao inves de evento WS `history:load`, pois lazy-loading via HTTP e mais eficiente
 
-**Plugin root:** `~/.claude/plugins/marketplaces/paulojalowyj/task-viewer/`
+**Plugin root:** `~/.claude/plugins/marketplaces/orionlabz/task-viewer/`
 
 ---
 
@@ -56,7 +56,7 @@
 
 ```json
 {
-  "name": "superpower-kanban",
+  "name": "task-viewer",
   "description": "Real-time task visualization plugins for Claude Code",
   "owner": {
     "name": "OrionLabz"
@@ -139,7 +139,7 @@
 
 - [ ] **Step 5: Install dependencies**
 
-Run: `cd ~/.claude/plugins/marketplaces/paulojalowyj/task-viewer/hooks/server && npm install`
+Run: `cd ~/.claude/plugins/marketplaces/orionlabz/task-viewer/hooks/server && npm install`
 Expected: `node_modules` created, `package-lock.json` generated
 
 - [ ] **Step 6: Add node_modules to .gitignore**
@@ -152,7 +152,7 @@ node_modules/
 - [ ] **Step 7: Commit**
 
 ```bash
-cd ~/.claude/plugins/marketplaces/paulojalowyj
+cd ~/.claude/plugins/marketplaces/orionlabz
 git add marketplace.json task-viewer/.claude-plugin/plugin.json task-viewer/hooks/hooks.json task-viewer/hooks/server/package.json task-viewer/hooks/server/package-lock.json task-viewer/hooks/server/.gitignore
 git commit -m "feat: scaffold plugin structure and manifests"
 ```
@@ -400,13 +400,13 @@ export async function loadAllPlans(projectCwd) {
 
 - [ ] **Step 8: Test parsers manually**
 
-Run: `cd ~/.claude/plugins/marketplaces/paulojalowyj/task-viewer/hooks/server && node -e "import('./parsers.mjs').then(async m => { const plans = await m.loadAllPlans('$PWD/../../../../../Projetos/siderea/aurora'); console.log(JSON.stringify(plans, null, 2)); })"`
+Run: `cd ~/.claude/plugins/marketplaces/orionlabz/task-viewer/hooks/server && node -e "import('./parsers.mjs').then(async m => { const plans = await m.loadAllPlans('$PWD/../../../../../Projetos/siderea/aurora'); console.log(JSON.stringify(plans, null, 2)); })"`
 Expected: Parsed plan output with tasks and progress percentages
 
 - [ ] **Step 9: Commit**
 
 ```bash
-cd ~/.claude/plugins/marketplaces/paulojalowyj
+cd ~/.claude/plugins/marketplaces/orionlabz
 git add task-viewer/hooks/server/parsers.mjs
 git commit -m "feat: add task/spec/plan parsers and session discovery"
 ```
@@ -546,7 +546,7 @@ export class WatcherManager {
 - [ ] **Step 2: Commit**
 
 ```bash
-cd ~/.claude/plugins/marketplaces/paulojalowyj
+cd ~/.claude/plugins/marketplaces/orionlabz
 git add task-viewer/hooks/server/watchers.mjs
 git commit -m "feat: add file watchers with debounce and session switching"
 ```
@@ -661,13 +661,13 @@ process.on('SIGINT', shutdown);
 
 - [ ] **Step 2: Test server starts and serves**
 
-Run: `cd ~/.claude/plugins/marketplaces/paulojalowyj/task-viewer/hooks/server && PROJECT_CWD=/Users/paulojalowyj/Projetos/siderea/aurora timeout 5 node server.mjs 2>&1 || true`
+Run: `cd ~/.claude/plugins/marketplaces/orionlabz/task-viewer/hooks/server && PROJECT_CWD=/Users/orionlabz/Projetos/siderea/aurora timeout 5 node server.mjs 2>&1 || true`
 Expected: "Task Viewer running at http://localhost:37778" + "Watching project: ..."
 
 - [ ] **Step 3: Commit**
 
 ```bash
-cd ~/.claude/plugins/marketplaces/paulojalowyj
+cd ~/.claude/plugins/marketplaces/orionlabz
 git add task-viewer/hooks/server/server.mjs
 git commit -m "feat: add Express + WebSocket server with lifecycle management"
 ```
@@ -771,7 +771,7 @@ git commit -m "feat: add Express + WebSocket server with lifecycle management"
 - [ ] **Step 2: Commit**
 
 ```bash
-cd ~/.claude/plugins/marketplaces/paulojalowyj
+cd ~/.claude/plugins/marketplaces/orionlabz
 git add task-viewer/hooks/server/public/index.html
 git commit -m "feat: add dashboard HTML structure"
 ```
@@ -1048,7 +1048,7 @@ body {
 - [ ] **Step 2: Commit**
 
 ```bash
-cd ~/.claude/plugins/marketplaces/paulojalowyj
+cd ~/.claude/plugins/marketplaces/orionlabz
 git add task-viewer/hooks/server/public/styles.css
 git commit -m "feat: add Aurora-themed CSS with OKLch colors and animations"
 ```
@@ -1370,7 +1370,7 @@ loadHistory();
 - [ ] **Step 5: Commit**
 
 ```bash
-cd ~/.claude/plugins/marketplaces/paulojalowyj
+cd ~/.claude/plugins/marketplaces/orionlabz
 git add task-viewer/hooks/server/public/app.js
 git commit -m "feat: add client-side JS with WebSocket, kanban, specs, and history rendering"
 ```
@@ -1395,7 +1395,7 @@ Plugin README with: overview, features, automatic behavior, manual usage, troubl
 
 - [ ] **Step 3: Create marketplace README.md**
 
-Root README for the `superpower-kanban` marketplace with installation instructions.
+Root README for the `task-viewer` marketplace with installation instructions.
 
 - [ ] **Step 4: Create LICENSE**
 
@@ -1404,7 +1404,7 @@ MIT license.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd ~/.claude/plugins/marketplaces/paulojalowyj
+cd ~/.claude/plugins/marketplaces/orionlabz
 git add task-viewer/skills/task-viewer/SKILL.md task-viewer/README.md README.md LICENSE
 git commit -m "feat: add skill, documentation, and license"
 ```
@@ -1415,7 +1415,7 @@ git commit -m "feat: add skill, documentation, and license"
 
 - [ ] **Step 1: Start server manually and verify dashboard loads**
 
-Run: `cd ~/.claude/plugins/marketplaces/paulojalowyj/task-viewer/hooks/server && PROJECT_CWD=/Users/paulojalowyj/Projetos/siderea/aurora node server.mjs &`
+Run: `cd ~/.claude/plugins/marketplaces/orionlabz/task-viewer/hooks/server && PROJECT_CWD=/Users/orionlabz/Projetos/siderea/aurora node server.mjs &`
 
 Open: `http://localhost:37778`
 Expected: Dashboard loads with Aurora theme, shows current tasks from active session, shows specs/plans from Aurora project
@@ -1433,8 +1433,8 @@ kill %1
 - [ ] **Step 4: Update spec in plugin repo and push**
 
 ```bash
-cd ~/.claude/plugins/marketplaces/paulojalowyj
-cp /Users/paulojalowyj/Projetos/siderea/aurora/docs/superpowers/specs/2026-03-24-task-viewer-plugin-design.md docs/design-spec.md
+cd ~/.claude/plugins/marketplaces/orionlabz
+cp /Users/orionlabz/Projetos/siderea/aurora/docs/superpowers/specs/2026-03-24-task-viewer-plugin-design.md docs/design-spec.md
 git add docs/design-spec.md
 git commit -m "docs: update design spec to final version"
 git push origin main
