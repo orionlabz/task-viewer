@@ -3,7 +3,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, basename, dirname } from 'node:path';
 import { discoverProjectSessions } from './parsers.mjs';
-import { upsertSession, upsertTask, getSessionTasks } from './storage.mjs';
+import { upsertSession, upsertTask, listKanban } from './storage.mjs';
 
 const CLAUDE_DIR = join(homedir(), '.claude');
 
@@ -70,42 +70,17 @@ export class WatcherManager {
   }
 
   async _initialTaskLoad() {
-    // Find the most recently modified task dir that has json files
-    const tasksBase = join(CLAUDE_DIR, 'tasks');
-    try {
-      const dirs = await readdir(tasksBase, { withFileTypes: true });
-      let bestDir = null;
-      let bestMtime = 0;
-
-      for (const d of dirs) {
-        if (!d.isDirectory()) continue;
-        const dirPath = join(tasksBase, d.name);
-        try {
-          const files = await readdir(dirPath);
-          const jsonFiles = files.filter(f => f.endsWith('.json') && !f.startsWith('.'));
-          if (jsonFiles.length === 0) continue;
-
-          // Check modification time of the directory
-          const { mtimeMs } = await import('node:fs').then(fs =>
-            fs.promises.stat(dirPath)
-          );
-          if (mtimeMs > bestMtime) {
-            bestMtime = mtimeMs;
-            bestDir = d.name;
-          }
-        } catch { /* skip */ }
-      }
-
-      if (bestDir) {
-        this.activeSessionId = bestDir;
-        upsertSession(bestDir, this.projectCwd);
-        await this._syncTasksFromDisk(bestDir);
-        return;
-      }
-    } catch { /* no tasks dir */ }
-
-    // No tasks found
-    this.onUpdate('tasks:update', { tasks: [], sessionId: this.activeSessionId });
+    // Only sync sessions that belong to this project — never steal sessions from other projects
+    const sessions = await discoverProjectSessions(this.projectCwd);
+    if (sessions.length === 0) {
+      this.onUpdate('kanban:update', { columns: { backlog: [], todo: [], in_progress: [], done: [] } });
+      return;
+    }
+    this.activeSessionId = sessions[0].sessionId;
+    upsertSession(this.activeSessionId, this.projectCwd);
+    for (const s of sessions) {
+      await this._syncTasksFromDisk(s.sessionId);
+    }
   }
 
   async _syncTasksFromDisk(sessionId) {
@@ -132,8 +107,8 @@ export class WatcherManager {
         } catch { /* skip malformed */ }
       }
 
-      const tasks = getSessionTasks(sessionId);
-      this.onUpdate('tasks:update', { tasks, sessionId });
+      const columns = listKanban(this.projectCwd);
+      this.onUpdate('kanban:update', { columns });
     } catch { /* tasks dir may not exist yet */ }
   }
 

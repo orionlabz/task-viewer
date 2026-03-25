@@ -10,7 +10,10 @@ import {
   getSession,
   getSessionTasks,
   listSessions,
-  listFeatures,
+  listKanban,
+  enrichTask,
+  moveTask,
+  getDashboard,
   finalizeSession,
 } from './storage.mjs';
 
@@ -36,18 +39,18 @@ app.get('/', (_req, res) => {
 
 app.post('/api/tasks', (req, res) => {
   try {
-    const { sessionId, taskId, toolName, subject, description, status, activeForm } = req.body;
+    const { sessionId, taskId, toolName, subject, description, status, activeForm, kanban_column } = req.body;
     if (!sessionId || !taskId) return res.status(400).json({ error: 'sessionId and taskId required' });
 
     // Auto-create session if needed
     upsertSession(sessionId, PROJECT_CWD);
 
     // Upsert the task
-    upsertTask(sessionId, { id: taskId, subject, description, status, activeForm });
+    upsertTask(sessionId, { id: taskId, subject, description, status, activeForm, kanban_column });
 
-    // Broadcast updated features
-    const features = listFeatures(PROJECT_CWD);
-    broadcast('features:update', { features });
+    // Broadcast updated kanban
+    const columns = listKanban(PROJECT_CWD);
+    broadcast('kanban:update', { columns });
 
     res.json({ ok: true });
   } catch (err) {
@@ -70,11 +73,31 @@ app.post('/api/session-context/finalize', (req, res) => {
 
 app.get('/api/features', (_req, res) => {
   try {
-    const features = listFeatures(PROJECT_CWD);
+    const features = listKanban(PROJECT_CWD);
     res.json(features);
   } catch (err) {
     console.error('GET /api/features error:', err);
     res.status(500).json({ error: 'failed to list features' });
+  }
+});
+
+app.get('/api/kanban', (_req, res) => {
+  try {
+    const columns = listKanban(PROJECT_CWD);
+    res.json(columns);
+  } catch (err) {
+    console.error('GET /api/kanban error:', err);
+    res.status(500).json({ error: 'failed to list kanban' });
+  }
+});
+
+app.post('/api/kanban-notify', (_req, res) => {
+  try {
+    const columns = listKanban(PROJECT_CWD);
+    broadcast('kanban:update', { columns });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'notify failed' });
   }
 });
 
