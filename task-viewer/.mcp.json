@@ -1,0 +1,6 @@
+{
+  "task-viewer": {
+    "command": "node",
+    "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/server/mcp-server.mjs"]
+  }
+}
