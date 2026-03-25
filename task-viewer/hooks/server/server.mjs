@@ -171,6 +171,7 @@ app.post('/api/events/tool-call', (req, res) => {
     insertTaskEvent(taskId, sessionId, 'tool_call', { tool, input_summary: inputSummary || '' });
     res.json({ ok: true });
   } catch (err) {
+    console.error('POST /api/events/tool-call error:', err);
     res.status(500).json({ error: 'failed to record tool call' });
   }
 });
@@ -223,6 +224,10 @@ app.patch('/api/tasks/:id/steps', (req, res) => {
       component: task.component,
       tags: task.tags,
     });
+
+    // Broadcast updated kanban
+    const columns = listKanban(PROJECT_CWD);
+    broadcast('kanban:update', { columns });
 
     // Write back to source task file so file-watcher re-sync preserves the toggle
     const taskFilePath = `${homedir()}/.claude/tasks/${sessionId}/${req.params.id}.json`;
