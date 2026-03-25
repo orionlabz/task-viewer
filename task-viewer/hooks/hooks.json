@@ -23,6 +23,17 @@
             "timeout": 5000
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/reindex-gitnexus.sh",
+            "timeout": 5000,
+            "statusMessage": "Re-indexing GitNexus..."
+          }
+        ]
       }
     ],
     "Stop": [
@@ -31,8 +42,8 @@
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "Generate a 1-2 sentence summary of what was accomplished this session. POST using: curl -s -X POST -H 'Content-Type: application/json' -d '{\"sessionId\": \"<current session id>\", \"summary\": \"<your summary>\"}' http://localhost:37778/api/session-context/finalize. Then approve stopping.",
-            "timeout": 30000
+            "prompt": "Before stopping, do the following in order:\n1. If any source code (.mjs, .js, .ts, .css, .html) was modified this session, run gitnexus_detect_changes({scope: 'all'}) and briefly report which symbols and execution flows were affected. Flag any unexpected changes.\n2. Generate a 1-2 sentence summary of what was accomplished this session. POST using: curl -s -X POST -H 'Content-Type: application/json' -d '{\"sessionId\": \"<current session id>\", \"summary\": \"<your summary>\"}' http://localhost:37778/api/session-context/finalize.\n3. Then approve stopping.",
+            "timeout": 60000
           }
         ]
       }

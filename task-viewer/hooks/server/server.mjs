@@ -105,8 +105,12 @@ const watchers = new WatcherManager(PROJECT_CWD, (type, data) => {
   broadcast(type, data);
 });
 
-wss.on('connection', async () => {
-  await watchers.emitCurrentState();
+wss.on('connection', async (ws) => {
+  try {
+    await watchers.emitCurrentState();
+  } catch (err) {
+    console.error('Failed to emit state on connection:', err);
+  }
 });
 
 server.listen(PORT, () => {
@@ -126,7 +130,10 @@ watchers.start().catch(err => {
   console.error('Failed to start watchers:', err);
 });
 
+let shuttingDown = false;
 async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log('Shutting down Task Viewer...');
   if (watchers.activeSessionId) {
     try {
@@ -143,3 +150,6 @@ async function shutdown() {
 
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled rejection:', err);
+});
