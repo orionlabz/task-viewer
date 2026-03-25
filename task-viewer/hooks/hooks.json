@@ -2,10 +2,11 @@
   "hooks": {
     "SessionStart": [
       {
+        "matcher": "startup|clear|compact",
         "hooks": [
           {
             "type": "command",
-            "command": "PROJECT_CWD=\"$PWD\" && HASH=$(echo -n \"$PROJECT_CWD\" | if command -v md5 >/dev/null 2>&1; then md5 -q; else md5sum | cut -d' ' -f1; fi) && cd \"${CLAUDE_PLUGIN_ROOT}/hooks/server\" && ([ -d node_modules ] || npm install --silent) && PROJECT_CWD=\"$PROJECT_CWD\" nohup node server.mjs > /tmp/task-viewer-$HASH.log 2>&1 & echo $! > /tmp/task-viewer-$HASH.pid",
+            "command": "PROJECT_CWD=\"$PWD\" && HASH=$(echo -n \"$PROJECT_CWD\" | md5 -q 2>/dev/null || echo -n \"$PROJECT_CWD\" | md5sum | cut -d' ' -f1) && cd \"${CLAUDE_PLUGIN_ROOT}/hooks/server\" && ([ -d node_modules ] || npm install --silent) && PROJECT_CWD=\"$PROJECT_CWD\" nohup node server.mjs > /tmp/task-viewer-$HASH.log 2>&1 & echo $! > /tmp/task-viewer-$HASH.pid",
             "timeout": 30000,
             "statusMessage": "Starting Task Viewer..."
           }
@@ -17,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "HASH=$(echo -n \"$PWD\" | if command -v md5 >/dev/null 2>&1; then md5 -q; else md5sum | cut -d' ' -f1; fi) && if [ -f /tmp/task-viewer-$HASH.pid ]; then kill $(cat /tmp/task-viewer-$HASH.pid) 2>/dev/null; rm -f /tmp/task-viewer-$HASH.pid; fi",
+            "command": "HASH=$(echo -n \"$PWD\" | md5 -q 2>/dev/null || echo -n \"$PWD\" | md5sum | cut -d' ' -f1) && if [ -f /tmp/task-viewer-$HASH.pid ]; then kill $(cat /tmp/task-viewer-$HASH.pid) 2>/dev/null; rm -f /tmp/task-viewer-$HASH.pid; fi",
             "timeout": 5000,
             "statusMessage": "Stopping Task Viewer..."
           }
