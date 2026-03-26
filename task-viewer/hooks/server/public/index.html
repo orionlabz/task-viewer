@@ -17,8 +17,8 @@
         <span class="project-badge" id="project-name">—</span>
         <span class="session-badge" id="session-id">—</span>
         <div class="view-toggle" id="view-toggle">
-          <button class="view-btn active" id="view-kanban" aria-pressed="true" title="Kanban view">⊞</button>
-          <button class="view-btn" id="view-list" aria-pressed="false" title="List view">≡</button>
+          <button class="view-btn active" id="view-kanban" aria-pressed="true" title="Kanban view" aria-label="Kanban view">⊞</button>
+          <button class="view-btn" id="view-list" aria-pressed="false" title="List view" aria-label="List view">≡</button>
         </div>
       </div>
       <div class="toolbar-center" id="component-filters">
@@ -126,7 +126,7 @@
         <div class="panel-detail hidden" id="panel-detail">
           <div class="panel-header panel-header-detail">
             <div class="panel-detail-title" id="detail-title">—</div>
-            <button class="panel-close" id="panel-close" title="Close">✕</button>
+            <button class="panel-close" id="panel-close" title="Close" aria-label="Close panel">✕</button>
             <div class="panel-detail-badges" id="detail-badges"></div>
           </div>
           <div class="panel-section">
@@ -140,7 +140,7 @@
           <div class="panel-section">
             <div class="panel-section-title">Suas Anotações</div>
             <div class="panel-user-notes" id="user-notes-list"></div>
-            <textarea class="panel-note-input" id="note-input" placeholder="Adicionar anotação..." rows="2"></textarea>
+            <textarea class="panel-note-input" id="note-input" placeholder="Adicionar anotação..." rows="2" aria-label="Adicionar anotação"></textarea>
             <button class="panel-note-save" id="note-save">Salvar</button>
             <div class="panel-note-error hidden" id="note-error"></div>
           </div>
