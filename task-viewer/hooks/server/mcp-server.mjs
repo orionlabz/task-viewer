@@ -194,7 +194,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (name === 'task_annotate') {
       const { taskId, sessionId, note } = args;
       if (!taskId || !sessionId || !note?.trim()) {
-        return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: 'taskId, sessionId and note required' }) }] };
+        return { isError: true, content: [{ type: 'text', text: JSON.stringify({ ok: false, error: 'taskId, sessionId and note required' }) }] };
       }
       const event = insertTaskEvent(taskId, sessionId, 'claude_note', { text: note.trim(), tool: 'task_annotate' });
       return { content: [{ type: 'text', text: JSON.stringify({ ok: true, eventId: event.id }) }] };
@@ -203,10 +203,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (name === 'session_summarize') {
       const { summary, tasksCompleted = 0 } = args;
       if (!summary?.trim()) {
-        return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: 'summary required' }) }] };
+        return { isError: true, content: [{ type: 'text', text: JSON.stringify({ ok: false, error: 'summary required' }) }] };
       }
       const sessionId = process.env.CLAUDE_SESSION_ID || `session-${Date.now()}`;
       const projectCwd = process.env.PROJECT_CWD || process.cwd();
+      if (!process.env.PROJECT_CWD) {
+        console.error('[session_summarize] WARNING: PROJECT_CWD env var not set, falling back to process.cwd():', projectCwd);
+      }
       upsertProjectSession(sessionId, projectCwd, summary.trim(), tasksCompleted);
       return { content: [{ type: 'text', text: JSON.stringify({ ok: true, sessionId }) }] };
     }
