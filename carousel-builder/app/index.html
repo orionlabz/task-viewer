@@ -417,7 +417,7 @@ const RENDERERS = {
     const { brand_logo='⬥', brand_name='Marca' } = S.brand;
     return `<div style="position:relative;width:1080px;height:1350px;overflow:hidden;background:#000;">
       ${bg}
-      <div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:54px 76px 60px;">
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:54px 76px 80px;">
         <div style="${INT}font-size:22px;color:#fff;opacity:.9;">${esc(brand_logo)} ${esc(brand_name)}</div>
         <div style="flex:1;"></div>
         <div style="${PF}font-size:84px;line-height:1.05;font-weight:400;color:#fff;margin-bottom:28px;">
@@ -426,6 +426,58 @@ const RENDERERS = {
         <div style="${INT}font-size:27px;color:#777;line-height:1.5;">${esc(slide.body)}</div>
       </div>
     </div>`;
+  },
+  b(slide, img) {
+  const bg = img
+    ? `<div style="position:absolute;inset:0;"><img src="${img}" style="width:100%;height:100%;object-fit:cover;filter:saturate(0.6);"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.97) 0%,rgba(0,0,0,.6) 42%,transparent 72%);"></div></div>`
+    : `<div style="position:absolute;inset:0;background:linear-gradient(160deg,#2a3540,#1a2228);"></div>`;
+  const { brand_logo='⬥', brand_name='Marca', nav_left='CATEGORIA' } = S.brand;
+  const slideNum = String((S.slides.indexOf(slide) + 1)).padStart(2, '0');
+  return `<div style="position:relative;width:1080px;height:1350px;overflow:hidden;background:#000;">
+    ${bg}
+    <div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:54px 76px 80px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:auto;">
+        <div style="${INT}font-size:22px;color:#fff;opacity:.9;">${esc(brand_logo)} ${esc(brand_name)}</div>
+        <div style="${INT}font-size:18px;letter-spacing:.18em;color:#333;text-transform:uppercase;">Nº ${esc(slideNum)}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <div style="${INT}font-size:18px;letter-spacing:.18em;color:#333;text-transform:uppercase;margin-bottom:24px;">${esc(nav_left)}</div>
+        <div style="${PF}font-size:84px;line-height:1.05;font-weight:400;color:#fff;margin-bottom:28px;">
+          ${esc(slide.headline)}<em> ${esc(slide.headline_italic)}</em>
+        </div>
+        <div style="width:80px;height:1px;background:#2a2a2a;margin-bottom:28px;"></div>
+        <div style="${INT}font-size:27px;color:#666;line-height:1.5;">${esc(slide.body)}</div>
+      </div>
+    </div>
+  </div>`;
+},
+  c(slide, img) {
+  const bg = img
+    ? `<div style="position:absolute;inset:0;"><img src="${img}" style="width:100%;height:100%;object-fit:cover;filter:saturate(0.6);"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.97) 0%,rgba(0,0,0,.7) 55%,rgba(0,0,0,.3) 100%);"></div></div>`
+    : `<div style="position:absolute;inset:0;background:#050505;"></div>`;
+  const { brand_logo='⬥', brand_name='Marca', nav_left='CATEGORIA', nav_right='SÉRIE' } = S.brand;
+  const total = S.slides.length;
+  const idx = S.slides.indexOf(slide) + 1;
+  return `<div style="position:relative;width:1080px;height:1350px;overflow:hidden;background:#000;">
+    ${bg}
+    <div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:54px 76px 80px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;">
+        <div style="${INT}font-size:22px;color:#fff;opacity:.85;">${esc(brand_logo)} ${esc(brand_name)}</div>
+        <div style="${INT}font-size:18px;letter-spacing:.18em;color:#2a2a2a;text-transform:uppercase;">${esc(nav_right)}</div>
+      </div>
+      <div style="width:100%;height:1px;background:linear-gradient(to right,#fff,transparent);margin-bottom:48px;"></div>
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+        <div style="${PF}font-size:84px;line-height:1.05;font-weight:400;color:#fff;margin-bottom:28px;">
+          ${esc(slide.headline)}<em> ${esc(slide.headline_italic)}</em>
+        </div>
+        <div style="${INT}font-size:27px;color:#666;line-height:1.5;">${esc(slide.body)}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="${INT}font-size:18px;letter-spacing:.18em;color:#252525;text-transform:uppercase;">${esc(nav_left)}</div>
+        <div style="${INT}font-size:18px;letter-spacing:.12em;color:#252525;">${idx} / ${total}</div>
+      </div>
+    </div>
+  </div>`;
   } },
 
   split:   { a(slide, img) {
