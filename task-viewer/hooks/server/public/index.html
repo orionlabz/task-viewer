@@ -16,6 +16,10 @@
         <span class="app-title">Task Viewer</span>
         <span class="project-badge" id="project-name">—</span>
         <span class="session-badge" id="session-id">—</span>
+        <div class="view-toggle" id="view-toggle">
+          <button class="view-btn active" id="view-kanban" aria-pressed="true" title="Kanban view">⊞</button>
+          <button class="view-btn" id="view-list" aria-pressed="false" title="List view">≡</button>
+        </div>
       </div>
       <div class="toolbar-center" id="component-filters">
         <!-- component filter chips populated by JS -->
@@ -34,48 +38,125 @@
       Reconnecting to Task Viewer…
     </div>
 
-    <main class="board">
-      <div class="column" id="col-backlog">
-        <div class="column-header">
-          <span class="column-title">Backlog</span>
-          <span class="column-count" id="count-backlog">0</span>
+    <div class="workspace">
+      <main class="board" id="board">
+        <div class="column" id="col-backlog">
+          <div class="column-header">
+            <span class="column-title">Backlog</span>
+            <span class="column-count" id="count-backlog">0</span>
+          </div>
+          <div class="column-body" id="cards-backlog">
+            <div class="empty-state">No tasks here</div>
+          </div>
         </div>
-        <div class="column-body" id="cards-backlog">
-          <div class="empty-state">No tasks here</div>
-        </div>
-      </div>
 
-      <div class="column" id="col-todo">
-        <div class="column-header">
-          <span class="column-title">Todo</span>
-          <span class="column-count" id="count-todo">0</span>
+        <div class="column" id="col-todo">
+          <div class="column-header">
+            <span class="column-title">Todo</span>
+            <span class="column-count" id="count-todo">0</span>
+          </div>
+          <div class="column-body" id="cards-todo">
+            <div class="empty-state">No tasks here</div>
+          </div>
         </div>
-        <div class="column-body" id="cards-todo">
-          <div class="empty-state">No tasks here</div>
-        </div>
-      </div>
 
-      <div class="column" id="col-in_progress">
-        <div class="column-header">
-          <span class="column-title">In Progress</span>
-          <span class="column-count" id="count-in_progress">0</span>
+        <div class="column" id="col-in_progress">
+          <div class="column-header">
+            <span class="column-title">In Progress</span>
+            <span class="column-count" id="count-in_progress">0</span>
+          </div>
+          <div class="column-body" id="cards-in_progress">
+            <div class="empty-state">No tasks here</div>
+          </div>
         </div>
-        <div class="column-body" id="cards-in_progress">
-          <div class="empty-state">No tasks here</div>
-        </div>
-      </div>
 
-      <div class="column collapsed" id="col-done">
-        <div class="column-header" id="done-header" role="button" tabindex="0" aria-expanded="false">
-          <span class="column-title">Done</span>
-          <span class="column-count" id="count-done">0</span>
-          <span class="collapse-chevron">▶</span>
+        <div class="column collapsed" id="col-done">
+          <div class="column-header" id="done-header" role="button" tabindex="0" aria-expanded="false">
+            <span class="column-title">Done</span>
+            <span class="column-count" id="count-done">0</span>
+            <span class="collapse-chevron">▶</span>
+          </div>
+          <div class="column-body hidden" id="cards-done">
+            <div class="empty-state">No tasks here</div>
+          </div>
         </div>
-        <div class="column-body hidden" id="cards-done">
-          <div class="empty-state">No tasks here</div>
+      </main>
+
+      <!-- List view (hidden by default) -->
+      <div class="list-view hidden" id="list-view"></div>
+
+      <!-- Persistent side panel -->
+      <aside class="side-panel" id="side-panel">
+        <!-- Idle state: project stats + timeline -->
+        <div class="panel-idle" id="panel-idle">
+          <div class="panel-header">
+            <div class="panel-project-name" id="panel-project-name">—</div>
+            <div class="panel-branch" id="panel-branch">—</div>
+          </div>
+          <div class="panel-section">
+            <div class="panel-section-title">Estatísticas</div>
+            <div class="panel-stats-grid">
+              <div class="stat-cell">
+                <div class="stat-value stat-done" id="stat-done">0</div>
+                <div class="stat-label">concluídas</div>
+              </div>
+              <div class="stat-cell">
+                <div class="stat-value stat-progress" id="stat-progress">0</div>
+                <div class="stat-label">em progresso</div>
+              </div>
+              <div class="stat-cell">
+                <div class="stat-value stat-pct" id="stat-pct">0%</div>
+                <div class="stat-label">completion</div>
+              </div>
+              <div class="stat-cell">
+                <div class="stat-value stat-sessions" id="stat-sessions">0</div>
+                <div class="stat-label">sessões</div>
+              </div>
+            </div>
+          </div>
+          <div class="panel-section panel-section-grow">
+            <div class="panel-section-title">Timeline do Projeto</div>
+            <div class="panel-timeline" id="panel-timeline">
+              <div class="timeline-empty">Nenhuma sessão registrada ainda.</div>
+            </div>
+          </div>
         </div>
-      </div>
-    </main>
+
+        <!-- Task detail state (hidden until task selected) -->
+        <div class="panel-detail hidden" id="panel-detail">
+          <div class="panel-header panel-header-detail">
+            <div class="panel-detail-title" id="detail-title">—</div>
+            <button class="panel-close" id="panel-close" title="Close">✕</button>
+            <div class="panel-detail-badges" id="detail-badges"></div>
+          </div>
+          <div class="panel-section">
+            <div class="panel-section-title">Detalhes</div>
+            <div class="panel-detail-meta" id="detail-meta"></div>
+          </div>
+          <div class="panel-section" id="steps-section">
+            <div class="panel-section-title">Steps</div>
+            <div class="panel-steps" id="detail-steps"></div>
+          </div>
+          <div class="panel-section">
+            <div class="panel-section-title">Suas Anotações</div>
+            <div class="panel-user-notes" id="user-notes-list"></div>
+            <textarea class="panel-note-input" id="note-input" placeholder="Adicionar anotação..." rows="2"></textarea>
+            <button class="panel-note-save" id="note-save">Salvar</button>
+            <div class="panel-note-error hidden" id="note-error"></div>
+          </div>
+          <div class="panel-section">
+            <div class="panel-section-title">Anotações do Claude</div>
+            <div class="panel-claude-notes" id="claude-notes-list"></div>
+          </div>
+          <div class="panel-tabs">
+            <button class="panel-tab active" id="tab-progress" data-tab="progress">Progresso</button>
+            <button class="panel-tab" id="tab-execution" data-tab="execution">Execução</button>
+          </div>
+          <div class="panel-tab-content" id="tab-content-progress"></div>
+          <div class="panel-tab-content hidden" id="tab-content-execution"></div>
+        </div>
+      </aside>
+    </div>
   </div>
   <script src="app.js"></script>
 </body>
