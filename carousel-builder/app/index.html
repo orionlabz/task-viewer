@@ -772,6 +772,33 @@ const RENDERERS = {
         ${footerBar()}
       </div>
     </div>`;
+  },
+  b(slide, img) {
+    const photo = img
+      ? `<img src="${img}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`
+      : `<div style="position:absolute;inset:0;background:linear-gradient(160deg,#2a3540,#1a2228);"></div>`;
+    const { brand_logo='⬥', brand_name='Marca', nav_left='CATEGORIA', nav_right='SÉRIE' } = S.brand;
+    return `<div style="width:1080px;height:1350px;background:#000;position:relative;overflow:hidden;">
+    ${photo}
+    <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.97) 0%,rgba(0,0,0,.75) 40%,rgba(0,0,0,.2) 70%,transparent 100%);"></div>
+    <div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:54px 76px 80px;">
+      <div style="display:flex;align-items:center;gap:22px;">
+        <span style="${INT}font-size:18px;letter-spacing:.18em;color:rgba(255,255,255,.18);text-transform:uppercase;">${esc(nav_left)}</span>
+        <div style="flex:1;height:1px;background:rgba(255,255,255,.06);"></div>
+        <span style="${INT}font-size:18px;letter-spacing:.18em;color:rgba(255,255,255,.18);text-transform:uppercase;">${esc(nav_right)}</span>
+      </div>
+      <div style="flex:1;"></div>
+      <div style="${INT}font-size:18px;letter-spacing:.18em;color:#3a3a3a;text-transform:uppercase;margin-bottom:20px;">${esc(slide.section_number)} — ${esc(slide.section_title)}</div>
+      <div style="${PF}font-size:72px;line-height:1.05;font-weight:400;color:#fff;margin-bottom:28px;">
+        ${esc(slide.headline)}<em> ${esc(slide.headline_italic||'')}</em>
+      </div>
+      <div style="${INT}font-size:27px;color:#666;line-height:1.5;margin-bottom:36px;">${esc(slide.body)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="${INT}font-size:22px;color:#1e1e1e;">${esc(brand_logo)} ${esc(brand_name)}</span>
+        <span style="${INT}font-size:22px;letter-spacing:.14em;color:#1a1a1a;text-transform:uppercase;">${esc(brand_name)}</span>
+      </div>
+    </div>
+  </div>`;
   } },
 
   cta:     { a(slide) {
