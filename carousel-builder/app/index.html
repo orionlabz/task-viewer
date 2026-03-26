@@ -139,6 +139,16 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .btn-refine:hover { border-color: #555; color: var(--text); }
 .refine-input-wrap { display: none; flex-direction: column; gap: 8px; margin-top: 8px; }
 .refine-input-wrap.open { display: flex; }
+.icon-picker { display: flex; flex-direction: column; gap: 6px; }
+.icon-search-wrap { display: flex; gap: 6px; align-items: center; }
+.icon-search-input { flex: 1; }
+.icon-grid { display: flex; flex-wrap: wrap; gap: 4px; max-height: 80px; overflow-y: auto; }
+.icon-btn { width: 28px; height: 28px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; }
+.icon-btn:hover { border-color: #555; }
+.icon-btn.selected { border-color: #fff; }
+.icon-btn svg { width: 14px; height: 14px; }
+.icon-current { display: flex; align-items: center; gap: 8px; }
+.icon-current svg, .icon-current img { width: 18px; height: 18px; }
 .refine-actions { display: flex; gap: 6px; }
 .btn-confirm { background: #fff; color: #000; border: none; border-radius: 4px; padding: 6px 14px; font-size: 12px; font-weight: 500; cursor: pointer; }
 .btn-cancel { background: transparent; border: 1px solid var(--border); color: var(--text-muted); border-radius: 4px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
@@ -395,6 +405,87 @@ function getLucideSVG(name, size = 48, color = '#333') {
     return `<${tag} ${attrStr}/>`;
   }).join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${childSVG}</svg>`;
+}
+
+function searchLucideIcons(query) {
+  if (!window.lucide) return [];
+  return Object.keys(lucide.icons)
+    .filter(n => n.includes(query.toLowerCase().replace(/\s+/g, '-')))
+    .slice(0, 30);
+}
+
+function setStepIcon(stepIdx, iconData) {
+  const slide = S.slides[S.active];
+  if (!slide || !slide.steps) return;
+  if (!slide.steps[stepIdx]) return;
+  slide.steps[stepIdx].icon = iconData;
+  refreshThumb(S.active);
+  renderPreview();
+  renderPanel();
+  scheduleSave();
+}
+
+function renderIconPicker(stepIdx, currentIcon) {
+  const svg = currentIcon?.type === 'lucide' && currentIcon.svg
+    ? currentIcon.svg : null;
+  const uploadSrc = currentIcon?.type === 'upload' ? currentIcon.src : null;
+  const previewHTML = svg
+    ? svg
+    : uploadSrc
+      ? `<img src="${uploadSrc}" style="width:18px;height:18px;object-fit:contain;">`
+      : `<div style="width:18px;height:18px;border:1px dashed #333;border-radius:3px;"></div>`;
+
+  return `<div class="icon-picker" id="icon-picker-${stepIdx}">
+    <div class="field-label">Ícone</div>
+    <div class="icon-current">${previewHTML}<span style="font-size:11px;color:#555;">${currentIcon?.name || 'nenhum'}</span></div>
+    <div class="icon-search-wrap">
+      <input class="field-input icon-search-input" placeholder="buscar ícone…" oninput="renderIconGrid(${stepIdx}, this.value)">
+    </div>
+    <div id="icon-grid-${stepIdx}" class="icon-grid"></div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span class="field-label" style="margin:0;">ou upload</span>
+      <input type="file" accept="image/png,image/svg+xml" style="font-size:11px;color:#666;flex:1;"
+        onchange="handleIconUpload(${stepIdx}, this)">
+    </div>
+  </div>`;
+}
+
+function renderIconGrid(stepIdx, query) {
+  const grid = document.getElementById('icon-grid-' + stepIdx);
+  if (!grid || !query) { if (grid) grid.innerHTML = ''; return; }
+  const names = searchLucideIcons(query);
+  const slide = S.slides[S.active];
+  const current = slide?.steps?.[stepIdx]?.icon?.name;
+  grid.innerHTML = names.map(name => {
+    const svg = getLucideSVG(name, 14, '#888');
+    if (!svg) return '';
+    return `<button class="icon-btn${name === current ? ' selected' : ''}" title="${name}"
+      onclick="pickLucideIcon(${stepIdx},'${name}')">${svg}</button>`;
+  }).join('');
+}
+
+function pickLucideIcon(stepIdx, name) {
+  const svg = getLucideSVG(name, 48, '#333');
+  if (!svg) return;
+  setStepIcon(stepIdx, { type: 'lucide', name, svg });
+}
+
+function handleIconUpload(stepIdx, input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!['image/png', 'image/svg+xml'].includes(file.type)) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    let src = e.target.result;
+    // Strip script tags from SVG for safety
+    if (file.type === 'image/svg+xml') {
+      src = 'data:image/svg+xml;base64,' + btoa(
+        atob(src.split(',')[1]).replace(/<script[\s\S]*?<\/script>/gi, '')
+      );
+    }
+    setStepIcon(stepIdx, { type: 'upload', src });
+  };
+  reader.readAsDataURL(file);
 }
 
 function navBar() {
@@ -857,6 +948,7 @@ function renderPanel() {
               <button class="btn-remove" onclick="removeStep(${i})">×</button>
             </div>
             <input class="field-input" value="${esc(step.text)}" placeholder="Texto da etapa" oninput="setStep(${i},'text',this.value)">
+            ${slide.layout === 'c' ? renderIconPicker(i, (slide.steps[i] || {}).icon) : ''}
           </div>`
         ).join('')}
       </div>
