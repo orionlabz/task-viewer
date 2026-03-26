@@ -229,14 +229,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         </div>
       </div>
       <div id="preview-wrap" class="preview-frame-wrap"></div>
-      <div class="template-pills">
-        <button class="pill" data-tpl="cover"   onclick="changeTpl('cover')">cover</button>
-        <button class="pill" data-tpl="split"   onclick="changeTpl('split')">split</button>
-        <button class="pill" data-tpl="dark"    onclick="changeTpl('dark')">conteúdo</button>
-        <button class="pill" data-tpl="steps"   onclick="changeTpl('steps')">etapas</button>
-        <button class="pill" data-tpl="overlay" onclick="changeTpl('overlay')">foto+texto</button>
-        <button class="pill" data-tpl="cta"     onclick="changeTpl('cta')">cta</button>
-      </div>
+      <div id="layout-pills" class="template-pills"></div>
     </div>
     <div class="edit-panel" id="edit-panel"></div>
   </div>
@@ -525,6 +518,15 @@ const RENDERERS = {
   } },
 };
 
+const LAYOUT_NAMES = {
+  cover:   { a: 'Ancorado', b: 'Editorial', c: 'Linha de corte' },
+  dark:    { a: 'Stacked',  b: 'Nº fundo',  c: '2 colunas' },
+  steps:   { a: 'Lista',    b: 'Numerado',   c: 'Ícones' },
+  overlay: { a: 'Foto topo', b: 'Full-bleed' },
+  split:   { a: 'Padrão' },
+  cta:     { a: 'Headline',  c: 'Centrado' },
+};
+
 function slideDoc(index) {
   const slide = S.slides[index];
   if (!slide) return '<html><body style="background:#111;width:1080px;height:1350px;"></body></html>';
@@ -589,9 +591,15 @@ function renderPreview() {
   iframe.srcdoc = slideDoc(S.active);
   iframe.title  = 'Preview';
   wrap.appendChild(iframe);
-  document.querySelectorAll('.pill').forEach(p =>
-    p.classList.toggle('active', p.dataset.tpl === (S.slides[S.active] || {}).template)
-  );
+  const slide = S.slides[S.active];
+  const pillsEl = document.getElementById('layout-pills');
+  if (slide && pillsEl) {
+    const variants = LAYOUT_NAMES[slide.template] || {};
+    const currentLayout = slide.layout || 'a';
+    pillsEl.innerHTML = Object.entries(variants).map(([key, name]) =>
+      `<button class="pill${key === currentLayout ? ' active' : ''}" onclick="changeLayout('${key}')">${name}</button>`
+    ).join('');
+  }
 }
 
 function renderPanel() {
@@ -754,6 +762,14 @@ function addSlide() {
 function changeTpl(tpl) {
   S.slides[S.active] = { ...SLIDE_DEFAULTS[tpl] };
   renderAll(); scheduleSave();
+}
+function changeLayout(layout) {
+  if (!S.slides[S.active]) return;
+  S.slides[S.active].layout = layout;
+  refreshThumb(S.active);
+  renderPreview();
+  renderPanel();
+  scheduleSave();
 }
 function uploadImg(event) {
   const file = event.target.files[0];
