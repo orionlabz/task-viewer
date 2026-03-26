@@ -142,7 +142,8 @@ Instrução: "${instruction}"
 Slide atual:
 ${JSON.stringify(slide, null, 2)}
 
-Retorne SOMENTE o JSON do slide atualizado, com os mesmos campos do template "${slide.template}".`;
+Retorne SOMENTE o JSON do slide atualizado, com os mesmos campos do template "${slide.template}".
+O campo "layout" DEVE ser preservado exatamente como está no slide original.`;
 
   return callClaude(userPrompt);
 }

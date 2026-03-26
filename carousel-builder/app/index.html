@@ -1121,7 +1121,11 @@ async function doRefine() {
   btn.textContent = '…'; btn.disabled = true;
   try {
     const refined = await callRefine(S.slides[S.active], instr);
+    const prevLayout = S.slides[S.active].layout;
     S.slides[S.active] = refined;
+    if (prevLayout && !S.slides[S.active].layout) {
+      S.slides[S.active].layout = prevLayout;
+    }
     renderAll(); scheduleSave();
   } catch (e) {
     alert('Erro ao refinar: ' + e.message);
