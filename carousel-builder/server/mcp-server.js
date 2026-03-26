@@ -1,5 +1,11 @@
 import { createServer } from 'node:http';
-import Anthropic from '@anthropic-ai/sdk';
+import { readFile } from 'node:fs/promises';
+import { join, resolve, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const APP_DIR = resolve(__dirname, '../app');
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -8,14 +14,67 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 const IS_MCP = process.argv.includes('--mcp');
-const PORT = 3456;
+const PORT = 37776;
 
-const client = new Anthropic(); // reads ANTHROPIC_API_KEY from env
+const MIME = {
+  '.html': 'text/html',
+  '.js':   'application/javascript',
+  '.css':  'text/css',
+  '.json': 'application/json',
+  '.png':  'image/png',
+  '.svg':  'image/svg+xml',
+  '.ico':  'image/x-icon',
+};
+
+async function serveStatic(req, res) {
+  const pathname = req.url === '/' ? '/index.html' : req.url.split('?')[0];
+  const filePath = join(APP_DIR, pathname);
+  if (!filePath.startsWith(APP_DIR)) { json(res, { error: 'Forbidden' }, 403); return true; }
+  try {
+    const data = await readFile(filePath);
+    cors(res);
+    res.writeHead(200, { 'Content-Type': MIME[extname(filePath)] || 'application/octet-stream' });
+    res.end(data);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const SYSTEM_PROMPT = `Você é estrategista de conteúdo especializado em Instagram editorial.
 Crie carrosséis no estilo dark-luxury: direto, inteligente, provocativo mas refinado.
 Tom editorial, em português brasileiro.
 RESPONDA APENAS COM JSON VÁLIDO. Sem markdown, sem backticks, sem texto extra.`;
+
+function callClaude(userPrompt) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('claude', [
+      '-p',
+      '--output-format', 'json',
+      '--system-prompt', SYSTEM_PROMPT,
+      '--tools', '',
+      '--no-session-persistence',
+    ], { stdio: ['pipe', 'pipe', 'pipe'] });
+
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', chunk => (stdout += chunk));
+    proc.stderr.on('data', chunk => (stderr += chunk));
+    proc.stdin.write(userPrompt);
+    proc.stdin.end();
+
+    proc.on('close', code => {
+      if (code !== 0) return reject(new Error(stderr || `claude exited with code ${code}`));
+      try {
+        const parsed = JSON.parse(stdout);
+        const text = parsed.result ?? parsed.text ?? stdout;
+        resolve(JSON.parse(text));
+      } catch {
+        reject(new Error(`Claude returned non-JSON: ${stdout.slice(0, 200)}`));
+      }
+    });
+  });
+}
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
 
@@ -67,18 +126,13 @@ Templates e campos por tipo:
 - overlay: { template, section_number, section_title, headline, body }
 - cta:     { template, headline, headline_italic, body, cta_text, cta_word, cta_suffix }
 
-Retorne SOMENTE o JSON: { "slides": [...] }`;
+Retorne SOMENTE o JSON: { "slides": [...] }
 
-  const msg = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 4096,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userPrompt }],
-  });
+Cada slide DEVE incluir o campo "layout" com valor "a" (padrão).
+Exemplo de slide:
+{ "template": "dark", "layout": "a", "section_number": "01", "section_title": "...", ... }`;
 
-  const raw = msg.content[0].text;
-  try { return JSON.parse(raw); }
-  catch { throw new Error(`Claude returned non-JSON response: ${raw.slice(0, 200)}`); }
+  return callClaude(userPrompt);
 }
 
 async function refineSlide({ slide, instruction }) {
@@ -90,16 +144,7 @@ ${JSON.stringify(slide, null, 2)}
 
 Retorne SOMENTE o JSON do slide atualizado, com os mesmos campos do template "${slide.template}".`;
 
-  const msg = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userPrompt }],
-  });
-
-  const raw = msg.content[0].text;
-  try { return JSON.parse(raw); }
-  catch { throw new Error(`Claude returned non-JSON response: ${raw.slice(0, 200)}`); }
+  return callClaude(userPrompt);
 }
 
 async function brainstormIdeas({ niche, platform = 'Instagram', count = 5 }) {
@@ -108,16 +153,7 @@ Para cada tema: título provocativo, ângulo editorial único, e por que engaja.
 
 Retorne SOMENTE o JSON: { "ideas": [{ "title": "...", "angle": "...", "why": "..." }] }`;
 
-  const msg = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userPrompt }],
-  });
-
-  const raw = msg.content[0].text;
-  try { return JSON.parse(raw); }
-  catch { throw new Error(`Claude returned non-JSON response: ${raw.slice(0, 200)}`); }
+  return callClaude(userPrompt);
 }
 
 // ─── HTTP Bridge mode ─────────────────────────────────────────────────────────
@@ -133,12 +169,17 @@ async function handleRequest(req, res) {
   if (req.method === 'POST') {
     try {
       const body = await readBody(req);
-      if (req.url === '/generate') return json(res, await generateCarousel(body));
-      if (req.url === '/refine')   return json(res, await refineSlide(body));
+      if (req.url === '/generate')   return json(res, await generateCarousel(body));
+      if (req.url === '/refine')     return json(res, await refineSlide(body));
       if (req.url === '/brainstorm') return json(res, await brainstormIdeas(body));
     } catch (e) {
       return json(res, { error: e.message }, 500);
     }
+  }
+
+  if (req.method === 'GET') {
+    if (req.url === '/ping') return json(res, { ok: true });
+    if (await serveStatic(req, res)) return;
   }
 
   json(res, { error: 'Not found' }, 404);
