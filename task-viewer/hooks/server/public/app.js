@@ -545,9 +545,10 @@ function groupBursts(events, windowSeconds) {
   const bursts = [];
   let current = [events[0]];
   for (let i = 1; i < events.length; i++) {
-    const prev = new Date(events[i-1].createdAt + ' UTC').getTime();
-    const curr = new Date(events[i].createdAt + ' UTC').getTime();
-    if ((curr - prev) / 1000 <= windowSeconds) {
+    const prevTs = events[i-1].createdAt ? new Date(events[i-1].createdAt + ' UTC').getTime() : NaN;
+    const currTs = events[i].createdAt   ? new Date(events[i].createdAt   + ' UTC').getTime() : NaN;
+    const withinWindow = !isNaN(prevTs) && !isNaN(currTs) && (currTs - prevTs) / 1000 <= windowSeconds;
+    if (withinWindow || isNaN(prevTs) || isNaN(currTs)) {
       current.push(events[i]);
     } else {
       bursts.push(current);
