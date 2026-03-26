@@ -67,10 +67,12 @@ function callClaude(userPrompt) {
       if (code !== 0) return reject(new Error(stderr || `claude exited with code ${code}`));
       try {
         const parsed = JSON.parse(stdout);
-        const text = parsed.result ?? parsed.text ?? stdout;
+        let text = parsed.result ?? parsed.text ?? stdout;
+        // Strip markdown code fences if Claude wrapped the JSON
+        text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
         resolve(JSON.parse(text));
       } catch {
-        reject(new Error(`Claude returned non-JSON: ${stdout.slice(0, 200)}`));
+        reject(new Error(`Claude returned non-JSON: ${stdout.slice(0, 300)}`));
       }
     });
   });
