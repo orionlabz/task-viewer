@@ -15,6 +15,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    historyApiFallback: true,
     proxy: {
       '/generate': 'http://localhost:37776',
       '/refine': 'http://localhost:37776',

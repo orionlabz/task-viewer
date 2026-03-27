@@ -3,7 +3,7 @@ import './styles/components.css';
 import './styles/editor.css';
 import { S } from './state.js';
 import { checkBridge } from './api.js';
-import { navigate, registerScreen } from './router.js';
+import { initRouter, registerScreen } from './router.js';
 import { mountHome, unmountHome } from './screens/home.js';
 
 // Register screens (lazy imports resolved when navigated to)
@@ -23,7 +23,7 @@ registerScreen('theme-editor', {
 
 async function init() {
   S.bridgeAvailable = await checkBridge();
-  navigate('home');
+  initRouter();
 }
 
 init();

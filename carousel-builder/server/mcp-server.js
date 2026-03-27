@@ -67,7 +67,21 @@ async function handleRequest(req, res) {
   }
 
   const served = await serveStatic(req, res);
-  if (!served) json(res, { error: 'Not found' }, 404);
+  if (!served) {
+    // SPA fallback: paths without a file extension are frontend routes
+    const hasExt = /\.\w+$/.test(req.url.split('?')[0]);
+    if (!hasExt) {
+      const indexPath = join(APP_DIR, 'index.html');
+      try {
+        const data = await readFile(indexPath);
+        cors(res);
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(data);
+      } catch { json(res, { error: 'Not found' }, 404); }
+    } else {
+      json(res, { error: 'Not found' }, 404);
+    }
+  }
 }
 
 // ─── HTTP mode ────────────────────────────────────────────────────────────────
