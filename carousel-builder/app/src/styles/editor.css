@@ -1,2 +1,18 @@
 /* Editor screen shell */
 .screen-editor { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── Theme editor ────────────────────────────────────────────────────────── */
+.screen-theme { min-height: 100vh; display: flex; flex-direction: column; }
+.theme-main { flex: 1; padding: 24px 28px; overflow-y: auto; }
+.theme-columns { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; max-width: 1400px; margin: 0 auto; }
+.theme-col { display: flex; flex-direction: column; gap: 20px; }
+.theme-section { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.theme-section-title { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; }
+.color-pickers-grid { display: flex; flex-direction: column; gap: 10px; }
+.brand-upload-row { display: flex; align-items: center; gap: 10px; }
+.brand-preview { height: 32px; object-fit: contain; }
+.brand-preview-dark { background: #e8e8e8; padding: 4px; border-radius: 4px; }
+.brand-preview-empty { font-size: 11px; color: var(--text-muted); }
+.upload-input { font-size: 11px; color: var(--text-muted); flex: 1; }
+.theme-preview-col { position: sticky; top: 24px; }
+.theme-preview-frame { width: 100%; aspect-ratio: 1080/1350; border: none; border-radius: 8px; overflow: hidden; }
