@@ -47,6 +47,7 @@ let loadingTimers = [];
 // ─── Full-screen generating view ──────────────────────────────────────────────
 let _genTimer = null;
 let _genEntryId = 0;
+let _previewTimer = null;
 
 function showGeneratingScreen(topic) {
   clearInterval(_genTimer);
@@ -792,6 +793,32 @@ html, body { margin: 0; padding: 0; background: #000; }
   win.document.close();
 }
 
+// Pre-render an image to canvas simulating object-fit:cover + img_position + scale
+async function preRenderImageForExport(imgSrc, imgPosition, containerW, containerH) {
+  const img = new Image();
+  img.src = imgSrc;
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; }).catch(() => null);
+  if (!img.naturalWidth) return null;
+
+  const { x = 50, y = 50, scale = 1 } = imgPosition || {};
+  const canvas = document.createElement('canvas');
+  canvas.width = containerW;
+  canvas.height = containerH;
+  const ctx = canvas.getContext('2d');
+
+  // object-fit: cover → scale to fill container, then apply user scale
+  const coverScale = Math.max(containerW / img.naturalWidth, containerH / img.naturalHeight) * scale;
+  const drawW = img.naturalWidth * coverScale;
+  const drawH = img.naturalHeight * coverScale;
+
+  // object-position: x% y%
+  const drawX = (containerW - drawW) * (x / 100);
+  const drawY = (containerH - drawH) * (y / 100);
+
+  ctx.drawImage(img, drawX, drawY, drawW, drawH);
+  return canvas.toDataURL('image/png');
+}
+
 async function exportPNG() {
   if (!window.html2canvas) {
     await new Promise((res, rej) => {
@@ -804,56 +831,57 @@ async function exportPNG() {
     if (!window.html2canvas) return;
   }
 
-  const { buildGoogleFontsUrl, defaultTheme } = await import('../theme.js');
-  const { getRenderer: gr } = await import('../renderers.js');
-  const theme = S.theme || defaultTheme();
-
-  // Ensure Google Fonts are loaded in the main document so html2canvas can use them
-  const fontUrl = buildGoogleFontsUrl(theme.font_display, theme.font_body, theme.font_ui);
-  if (!document.querySelector(`link[data-png-fonts]`)) {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = fontUrl;
-    link.setAttribute('data-png-fonts', '1');
-    document.head.appendChild(link);
-    await document.fonts.ready;
-    // Extra buffer for @import chain to resolve
-    await new Promise(r => setTimeout(r, 800));
-  }
-
-  const cssVars = `--t-bg:${theme.color_bg||'#000'};--t-text:${theme.color_text||'#e8e8e8'};--t-emphasis:${theme.color_emphasis||'#CCFF00'};--t-secondary:${theme.color_secondary||'#666'};--t-detail:${theme.color_detail||'#2a2a2a'};--t-border:${theme.color_border||'#1e1e1e'};font-family:'${theme.font_body||'Inter'}',sans-serif;`;
-
   for (let i = 0; i < S.slides.length; i++) {
+    const imgSrc = S.images[i];
     const slide = S.slides[i];
-    const html = gr(slide)(slide, S.images[i] || null, theme);
 
-    const container = document.createElement('div');
-    container.style.cssText = `position:fixed;left:-9999px;top:0;width:1080px;height:1350px;overflow:hidden;z-index:-1;${cssVars}background:${theme.color_bg||'#000'};`;
-    container.innerHTML = html;
-    document.body.appendChild(container);
+    // Pre-render background image with correct crop/position/scale before html2canvas sees it
+    const preRendered = imgSrc
+      ? await preRenderImageForExport(imgSrc, slide.img_position, 1080, 1350)
+      : null;
 
-    // Let images and fonts settle
-    await new Promise(r => setTimeout(r, 300));
+    // Render slide in a full-size iframe so CSS vars, fonts and layouts are correct
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;left:-1200px;top:0;width:1080px;height:1350px;border:none;';
+    iframe.srcdoc = slideDoc(i);
+    document.body.appendChild(iframe);
 
-    const canvas = await window.html2canvas(container, {
+    await new Promise(res => {
+      iframe.onload = () => setTimeout(res, 400);
+      setTimeout(res, 2000); // failsafe
+    });
+
+    // Replace object-fit:cover images with the pre-rendered canvas version
+    if (preRendered && iframe.contentDocument) {
+      iframe.contentDocument.querySelectorAll('img').forEach(img => {
+        if (img.style.objectFit === 'cover') {
+          const filter = img.style.filter;
+          img.src = preRendered;
+          img.style.cssText = `width:100%;height:100%;display:block;${filter ? 'filter:' + filter + ';' : ''}`;
+        }
+      });
+      // Let the replaced image render
+      await new Promise(r => setTimeout(r, 100));
+    }
+
+    const canvas = await window.html2canvas(iframe.contentDocument.body, {
       width: 1080,
       height: 1350,
       scale: 1,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: theme.color_bg || '#000',
+      backgroundColor: null,
       logging: false,
     });
 
-    document.body.removeChild(container);
+    document.body.removeChild(iframe);
 
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');
     a.download = `slide-${String(i + 1).padStart(2, '0')}.png`;
     a.click();
 
-    // Brief pause between downloads
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
   }
 }
 
@@ -868,14 +896,16 @@ function setActive(i) {
 function setField(key, val) {
   S.slides[S.active][key] = val;
   refreshThumb(S.active);
-  renderPreview();
+  clearTimeout(_previewTimer);
+  _previewTimer = setTimeout(renderPreview, 150);
   scheduleSave();
 }
 
 function setListItem(i, val) {
   S.slides[S.active].list_items[i] = val;
   refreshThumb(S.active);
-  renderPreview();
+  clearTimeout(_previewTimer);
+  _previewTimer = setTimeout(renderPreview, 150);
   scheduleSave();
 }
 
@@ -897,7 +927,8 @@ function removeListItem(i) {
 function setStep(i, field, val) {
   S.slides[S.active].steps[i][field] = val;
   refreshThumb(S.active);
-  renderPreview();
+  clearTimeout(_previewTimer);
+  _previewTimer = setTimeout(renderPreview, 150);
   scheduleSave();
 }
 
