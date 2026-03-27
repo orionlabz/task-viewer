@@ -85,7 +85,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .sidebar { width: 224px; min-width: 224px; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; padding: 10px 8px; gap: 8px; }
 .thumb-item { cursor: pointer; border: 1px solid transparent; border-radius: 6px; overflow: hidden; }
 .thumb-item.active { border-color: #fff; }
-.thumb-wrap { width: 208px; aspect-ratio: 1080 / 1350; overflow: hidden; border-radius: 4px; background: #111; }
+.thumb-wrap { width: 208px; height: 260px; overflow: hidden; border-radius: 4px; background: #111; }
 .thumb-wrap iframe { width: 1080px; height: 1350px; transform-origin: top left; transform: scale(0.1926); pointer-events: none; border: none; display: block; }
 .thumb-label { font-size: 10px; color: var(--text-muted); text-align: center; padding: 4px 0; }
 .btn-add-slide { background: transparent; border: 1px dashed var(--border); color: var(--text-muted); border-radius: 6px; padding: 8px; font-size: 12px; cursor: pointer; width: 208px; align-self: center; }
