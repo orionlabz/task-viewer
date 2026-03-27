@@ -60,12 +60,28 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 `);
 
-// Seed global theme if none exists
-const themeCount = db.prepare('SELECT COUNT(*) as c FROM themes').get();
-if (themeCount.c === 0) {
-  const info = db.prepare(`INSERT INTO themes (name) VALUES ('Dark Luxury')`).run();
-  db.prepare(`INSERT INTO settings (key, value) VALUES ('global_theme_id', ?)`).run(String(info.lastInsertRowid));
+// Seed: ensure global theme exists
+{
+  const themeCount = db.prepare('SELECT COUNT(*) as c FROM themes').get();
+  if (themeCount.c === 0) {
+    const info = db.prepare(`INSERT INTO themes (name) VALUES ('Dark Luxury')`).run();
+    db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES ('global_theme_id', ?)`).run(String(info.lastInsertRowid));
+  }
+  // Ensure global_theme_id setting always exists (in case it was never seeded)
+  const hasSetting = db.prepare("SELECT 1 FROM settings WHERE key = 'global_theme_id'").get();
+  if (!hasSetting) {
+    const firstTheme = db.prepare('SELECT id FROM themes ORDER BY id ASC LIMIT 1').get();
+    if (firstTheme) {
+      db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES ('global_theme_id', ?)`).run(String(firstTheme.id));
+    }
+  }
 }
+
+// ─── Column allowlists (prevent SQL injection via dynamic column names) ─────────
+
+const THEME_COLS = new Set(['name','font_display','font_body','color_bg','color_text','color_emphasis','color_secondary','color_detail','color_border','brand_name','brand_symbol','brand_logo_dark','brand_logo_light','nav_left','nav_right']);
+const PROJECT_COLS = new Set(['name','theme_id']);
+const CAROUSEL_COLS = new Set(['title','slides_json','images_json','thumbnail_path','project_id']);
 
 // ─── Theme queries ─────────────────────────────────────────────────────────────
 
@@ -78,18 +94,19 @@ export function listThemes() {
 }
 
 export function createTheme(data = {}) {
-  const cols = Object.keys(data).join(', ');
-  const placeholders = Object.keys(data).map(() => '?').join(', ');
-  const vals = Object.values(data);
-  if (!cols) {
-    return db.prepare('INSERT INTO themes DEFAULT VALUES').run().lastInsertRowid;
+  const keys = Object.keys(data).filter(k => THEME_COLS.has(k));
+  if (!keys.length) {
+    return db.prepare("INSERT INTO themes (name) VALUES ('Sem título')").run().lastInsertRowid;
   }
-  return db.prepare(`INSERT INTO themes (${cols}) VALUES (${placeholders})`).run(...vals).lastInsertRowid;
+  const placeholders = keys.map(() => '?').join(', ');
+  return db.prepare(`INSERT INTO themes (${keys.join(', ')}) VALUES (${placeholders})`).run(...keys.map(k => data[k])).lastInsertRowid;
 }
 
 export function updateTheme(id, data) {
-  const sets = Object.keys(data).map(k => `${k} = ?`).join(', ');
-  db.prepare(`UPDATE themes SET ${sets}, updated_at = datetime('now') WHERE id = ?`).run(...Object.values(data), id);
+  const keys = Object.keys(data).filter(k => THEME_COLS.has(k));
+  if (!keys.length) return;
+  const sets = keys.map(k => `${k} = ?`).join(', ');
+  db.prepare(`UPDATE themes SET ${sets}, updated_at = datetime('now') WHERE id = ?`).run(...keys.map(k => data[k]), id);
 }
 
 export function deleteTheme(id) {
@@ -98,8 +115,8 @@ export function deleteTheme(id) {
 
 export function getGlobalTheme() {
   const row = db.prepare("SELECT value FROM settings WHERE key = 'global_theme_id'").get();
-  if (!row) return getTheme(1);
-  return getTheme(Number(row.value));
+  if (!row) return null;
+  return getTheme(Number(row.value)) || null;
 }
 
 export function setGlobalTheme(id) {
@@ -127,8 +144,10 @@ export function createProject(name) {
 }
 
 export function updateProject(id, data) {
-  const sets = Object.keys(data).map(k => `${k} = ?`).join(', ');
-  db.prepare(`UPDATE projects SET ${sets}, updated_at = datetime('now') WHERE id = ?`).run(...Object.values(data), id);
+  const keys = Object.keys(data).filter(k => PROJECT_COLS.has(k));
+  if (!keys.length) return;
+  const sets = keys.map(k => `${k} = ?`).join(', ');
+  db.prepare(`UPDATE projects SET ${sets}, updated_at = datetime('now') WHERE id = ?`).run(...keys.map(k => data[k]), id);
 }
 
 export function deleteProject(id) {
@@ -156,8 +175,10 @@ export function createCarousel(projectId, title) {
 }
 
 export function updateCarousel(id, data) {
-  const sets = Object.keys(data).map(k => `${k} = ?`).join(', ');
-  db.prepare(`UPDATE carousels SET ${sets}, updated_at = datetime('now') WHERE id = ?`).run(...Object.values(data), id);
+  const keys = Object.keys(data).filter(k => CAROUSEL_COLS.has(k));
+  if (!keys.length) return;
+  const sets = keys.map(k => `${k} = ?`).join(', ');
+  db.prepare(`UPDATE carousels SET ${sets}, updated_at = datetime('now') WHERE id = ?`).run(...keys.map(k => data[k]), id);
 }
 
 export function deleteCarousel(id) {
