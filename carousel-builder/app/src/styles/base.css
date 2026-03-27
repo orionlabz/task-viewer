@@ -82,8 +82,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .editor-body { display: flex; flex: 1; overflow: hidden; }
 
 /* Sidebar */
-.sidebar { width: 224px; min-width: 224px; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; padding: 10px 8px; gap: 8px; }
-.thumb-item { cursor: pointer; border: 1px solid transparent; border-radius: 6px; overflow: hidden; }
+.sidebar { width: 224px; min-width: 224px; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; padding: 10px 8px; gap: 8px; min-height: 0; }
+.thumb-item { cursor: pointer; border: 1px solid transparent; border-radius: 6px; overflow: hidden; flex-shrink: 0; }
 .thumb-item.active { border-color: #fff; }
 .thumb-wrap { width: 208px; height: 260px; overflow: hidden; border-radius: 4px; background: #111; }
 .thumb-wrap iframe { width: 1080px; height: 1350px; transform-origin: top left; transform: scale(0.1926); pointer-events: none; border: none; display: block; }
