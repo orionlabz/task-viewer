@@ -68,3 +68,48 @@
   0%, 100% { opacity: 1; }
   50%       { opacity: .35; }
 }
+
+/* ── Image transform overlay ─────────────────────────────────────────────── */
+.img-transform-overlay {
+  position: absolute; inset: 0; z-index: 20;
+  cursor: grab; user-select: none;
+  border-radius: 8px; overflow: hidden;
+}
+.img-transform-overlay.dragging { cursor: grabbing; }
+.img-transform-img {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+  pointer-events: none; user-select: none; draggable: false;
+}
+.img-transform-handle {
+  position: absolute; bottom: 10px; right: 10px;
+  width: 22px; height: 22px;
+  background: rgba(255,255,255,.85); border: 1px solid rgba(0,0,0,.25);
+  border-radius: 4px; cursor: se-resize;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: #000; line-height: 1;
+}
+.img-transform-close {
+  position: absolute; top: 8px; right: 8px;
+  width: 26px; height: 26px;
+  background: rgba(0,0,0,.55); border: none; color: #fff;
+  border-radius: 50%; cursor: pointer; font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+}
+.img-transform-close:hover { background: rgba(0,0,0,.8); }
+.img-transform-hint {
+  position: absolute; bottom: 10px; left: 10px;
+  font-size: 10px; color: rgba(255,255,255,.5);
+  background: rgba(0,0,0,.4); padding: 3px 6px; border-radius: 3px;
+  pointer-events: none;
+}
+.btn-adjust-img {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-muted); border-radius: 4px;
+  padding: 6px 10px; font-size: 11px; cursor: pointer;
+  width: 100%; text-align: left; transition: all .15s;
+}
+.btn-adjust-img:hover { border-color: #555; color: var(--text); }
+
+/* ── Export buttons ──────────────────────────────────────────────────────── */
+.header-actions { display: flex; align-items: center; gap: 8px; }

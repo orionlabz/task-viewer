@@ -180,26 +180,38 @@ function renderPreview() {
   const col = document.getElementById('preview-col');
   const wrap = document.getElementById('preview-wrap');
   if (!col || !wrap) return;
+
   const avH = col.clientHeight - 80;
   const avW = col.clientWidth - 32;
   const scale = Math.min(avH / 1350, avW / 1080, 1);
   const w = Math.round(1080 * scale);
   const h = Math.round(1350 * scale);
-  wrap.style.width    = w + 'px';
-  wrap.style.height   = h + 'px';
-  wrap.style.overflow = 'hidden';
-  wrap.style.flexShrink = '0';
-  wrap.innerHTML = '';
-  const iframe = document.createElement('iframe');
-  iframe.style.width           = '1080px';
-  iframe.style.height          = '1350px';
-  iframe.style.transformOrigin = 'top left';
-  iframe.style.transform       = `scale(${scale})`;
-  iframe.style.border          = 'none';
-  iframe.style.display         = 'block';
+
+  // Reuse existing iframe to avoid flicker — only recreate when layout changes
+  let iframe = wrap.querySelector('iframe');
+  if (!iframe || wrap.dataset.pw !== String(w) || wrap.dataset.ph !== String(h)) {
+    wrap.style.width      = w + 'px';
+    wrap.style.height     = h + 'px';
+    wrap.style.overflow   = 'hidden';
+    wrap.style.flexShrink = '0';
+    wrap.dataset.pw = w;
+    wrap.dataset.ph = h;
+    // Remove any transform overlay before clearing
+    const overlay = wrap.querySelector('.img-transform-overlay');
+    if (overlay) overlay.remove();
+    wrap.innerHTML = '';
+    iframe = document.createElement('iframe');
+    iframe.style.width           = '1080px';
+    iframe.style.height          = '1350px';
+    iframe.style.transformOrigin = 'top left';
+    iframe.style.transform       = `scale(${scale})`;
+    iframe.style.border          = 'none';
+    iframe.style.display         = 'block';
+    iframe.title = 'Preview';
+    wrap.appendChild(iframe);
+  }
+
   iframe.srcdoc = slideDoc(S.active);
-  iframe.title  = 'Preview';
-  wrap.appendChild(iframe);
 
   const slide = S.slides[S.active];
   const pillsEl = document.getElementById('layout-pills');
@@ -255,14 +267,8 @@ function renderPanel() {
       }
     </div>`;
     if (imgSrc) {
-      const px = slide.img_position?.x ?? 50;
-      const py = slide.img_position?.y ?? 50;
-      const ps = Math.round((slide.img_position?.scale ?? 1) * 100);
       html += `<div class="field-group">
-        <div class="field-label">Posição &amp; Zoom</div>
-        <div class="img-pos-row"><span class="img-pos-lbl">H</span><input type="range" class="img-pos-slider" data-img-pos="x" min="0" max="100" value="${px}"><span class="img-pos-val" id="img-pos-x-val">${px}%</span></div>
-        <div class="img-pos-row"><span class="img-pos-lbl">V</span><input type="range" class="img-pos-slider" data-img-pos="y" min="0" max="100" value="${py}"><span class="img-pos-val" id="img-pos-y-val">${py}%</span></div>
-        <div class="img-pos-row"><span class="img-pos-lbl">Zoom</span><input type="range" class="img-pos-slider" data-img-pos="scale" min="100" max="300" step="5" value="${ps}"><span class="img-pos-val" id="img-pos-s-val">${ps}%</span></div>
+        <button class="btn-adjust-img" id="btn-adjust-img">↔ Reposicionar / Zoom</button>
       </div>`;
     }
   }
@@ -382,25 +388,8 @@ function renderPanel() {
   const inpImg = panel.querySelector('#inp-img');
   if (inpImg) inpImg.onchange = (e) => uploadImg(e);
 
-  panel.querySelectorAll('.img-pos-slider').forEach(el => {
-    el.addEventListener('input', () => {
-      const sl = S.slides[S.active];
-      if (!sl.img_position) sl.img_position = { x: 50, y: 50, scale: 1.0 };
-      const key = el.dataset.imgPos;
-      if (key === 'scale') {
-        sl.img_position.scale = Number(el.value) / 100;
-        const v = document.getElementById('img-pos-s-val');
-        if (v) v.textContent = el.value + '%';
-      } else {
-        sl.img_position[key] = Number(el.value);
-        const v = document.getElementById(`img-pos-${key}-val`);
-        if (v) v.textContent = el.value + '%';
-      }
-      refreshThumb(S.active);
-      renderPreview();
-      scheduleSave();
-    });
-  });
+  const adjustImgBtn = panel.querySelector('#btn-adjust-img');
+  if (adjustImgBtn) adjustImgBtn.onclick = showImgTransformOverlay;
 
   // List items
   panel.querySelectorAll('input[data-list-idx]').forEach(el => {
@@ -543,9 +532,136 @@ function setStepIcon(stepIdx, iconData) {
   scheduleSave();
 }
 
+// ─── Image transform overlay ──────────────────────────────────────────────────
+function showImgTransformOverlay() {
+  const wrap = document.getElementById('preview-wrap');
+  if (!wrap) return;
+  const imgSrc = S.images[S.active];
+  if (!imgSrc) return;
+  const slide = S.slides[S.active];
+
+  // Remove existing overlay if any
+  wrap.querySelector('.img-transform-overlay')?.remove();
+
+  const pos = { ...(slide.img_position || { x: 50, y: 50, scale: 1 }) };
+
+  const overlay = document.createElement('div');
+  overlay.className = 'img-transform-overlay';
+
+  const img = document.createElement('img');
+  img.className = 'img-transform-img';
+  img.src = imgSrc;
+  img.draggable = false;
+
+  const handle = document.createElement('div');
+  handle.className = 'img-transform-handle';
+  handle.title = 'Arraste para zoom';
+  handle.textContent = '⤡';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'img-transform-close';
+  closeBtn.textContent = '✕';
+  closeBtn.title = 'Fechar';
+
+  const hint = document.createElement('div');
+  hint.className = 'img-transform-hint';
+  hint.textContent = 'Arraste para mover · canto inferior direito para zoom';
+
+  overlay.appendChild(img);
+  overlay.appendChild(handle);
+  overlay.appendChild(closeBtn);
+  overlay.appendChild(hint);
+  wrap.appendChild(overlay);
+
+  function applyPos() {
+    img.style.objectPosition = `${pos.x}% ${pos.y}%`;
+    img.style.transform = `scale(${pos.scale})`;
+    img.style.transformOrigin = `${pos.x}% ${pos.y}%`;
+  }
+  applyPos();
+
+  let dragState = null;
+
+  overlay.addEventListener('mousedown', e => {
+    if (e.target === closeBtn || e.target === handle) return;
+    e.preventDefault();
+    dragState = { type: 'pan', x0: e.clientX, y0: e.clientY, px0: pos.x, py0: pos.y };
+    overlay.classList.add('dragging');
+  });
+
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragState = { type: 'scale', y0: e.clientY, s0: pos.scale };
+  });
+
+  function onMove(e) {
+    if (!dragState) return;
+    const rect = wrap.getBoundingClientRect();
+    if (dragState.type === 'pan') {
+      const dx = (e.clientX - dragState.x0) / rect.width * 100;
+      const dy = (e.clientY - dragState.y0) / rect.height * 100;
+      pos.x = Math.max(0, Math.min(100, dragState.px0 - dx * (pos.scale - 0.6)));
+      pos.y = Math.max(0, Math.min(100, dragState.py0 - dy * (pos.scale - 0.6)));
+    } else {
+      const dy = (dragState.y0 - e.clientY) / 120;
+      pos.scale = Math.max(1, Math.min(5, dragState.s0 + dy));
+    }
+    applyPos(); // instant visual feedback via overlay
+    slide.img_position = { x: Math.round(pos.x * 10) / 10, y: Math.round(pos.y * 10) / 10, scale: Math.round(pos.scale * 100) / 100 };
+  }
+
+  function onUp() {
+    if (!dragState) return;
+    dragState = null;
+    overlay.classList.remove('dragging');
+    // Update iframe and thumbnail once drag ends
+    refreshThumb(S.active);
+    renderPreview();
+    scheduleSave();
+  }
+
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+
+  closeBtn.onclick = () => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    overlay.remove();
+  };
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+async function exportPDF() {
+  const win = window.open('', '_blank', 'width=1200,height=900');
+  if (!win) { alert('Popup bloqueado. Permita popups para exportar.'); return; }
+
+  const { themeStyleBlock: tsb } = await import('../theme.js');
+  const { getRenderer: gr } = await import('../renderers.js');
+
+  const slidesHTML = S.slides.map((slide, i) => {
+    const fn = gr(slide);
+    return `<div class="sp">${fn(slide, S.images[i] || null, S.theme)}</div>`;
+  }).join('\n');
+
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>${esc(S.carousel?.title || 'Carrossel')}</title>
+${tsb(S.theme)}
+<style>
+@page { size: 1080px 1350px; margin: 0; }
+html, body { margin: 0; padding: 0; background: #000; }
+.sp { width: 1080px; height: 1350px; overflow: hidden; break-after: page; }
+</style></head><body>${slidesHTML}
+<script>document.fonts.ready.then(()=>window.print());<\/script>
+</body></html>`);
+  win.document.close();
+}
+
 // ─── Slide mutations ──────────────────────────────────────────────────────────
 function setActive(i) {
   S.active = i;
+  // Dismiss transform overlay when switching slides
+  document.querySelector('.img-transform-overlay')?.remove();
   renderAll();
 }
 
@@ -696,7 +812,10 @@ export function mountEditor() {
       <header class="editor-header">
         <button class="header-btn" id="btn-back">← Projetos</button>
         <div id="editor-topic" class="editor-topic"></div>
-        <div id="saved-dot" class="saved-dot"></div>
+        <div class="header-actions">
+          <button class="header-btn" id="btn-export-pdf" title="Exportar como PDF">↓ PDF</button>
+          <div id="saved-dot" class="saved-dot"></div>
+        </div>
       </header>
       <div class="editor-body">
         <div class="sidebar" id="sidebar"></div>
@@ -728,6 +847,8 @@ export function mountEditor() {
 
   document.getElementById('btn-back').onclick = () =>
     navigate('project', { projectId: S.projectId });
+
+  document.getElementById('btn-export-pdf').onclick = exportPDF;
 
   if (S.carousel) {
     document.getElementById('editor-topic').textContent = S.carousel.title || '';

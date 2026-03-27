@@ -34,7 +34,7 @@ export function createRichText({ value = '', onChange, placeholder = '' } = {}) 
     if (cmd === 'bold') document.execCommand('bold', false);
     else if (cmd === 'italic') document.execCommand('italic', false);
     else if (cmd === 'accent') toggleAccent();
-    cleanAfterExec();
+    // Note: sanitize() in getValue() normalizes <b>/<i> → <strong>/<em>
     onChange?.(getValue());
   }
 
@@ -42,26 +42,35 @@ export function createRichText({ value = '', onChange, placeholder = '' } = {}) 
     const sel = window.getSelection();
     if (!sel.rangeCount || sel.isCollapsed) return;
     const range = sel.getRangeAt(0);
-    // Check if already wrapped in .accent span
-    const parent = sel.anchorNode?.parentElement;
-    if (parent?.classList.contains('accent')) {
-      // Unwrap
-      const span = parent;
-      const frag = document.createDocumentFragment();
-      while (span.firstChild) frag.appendChild(span.firstChild);
-      span.replaceWith(frag);
-    } else {
-      const span = document.createElement('span');
-      span.className = 'accent';
-      try { range.surroundContents(span); } catch { /* partial selection */ }
-    }
-  }
 
-  // Replace browser bold/italic tags with semantic tags
-  function cleanAfterExec() {
-    editor.innerHTML = editor.innerHTML
-      .replace(/<b>/gi, '<strong>').replace(/<\/b>/gi, '</strong>')
-      .replace(/<i>/gi, '<em>').replace(/<\/i>/gi, '</em>');
+    // Detect if the selection's common ancestor is inside an .accent span
+    const ancestor = range.commonAncestorContainer;
+    const accentEl = (ancestor.nodeType === 3 ? ancestor.parentElement : ancestor)
+      ?.closest?.('.accent');
+    if (accentEl && editor.contains(accentEl)) {
+      // Unwrap the accent span
+      const frag = document.createDocumentFragment();
+      while (accentEl.firstChild) frag.appendChild(accentEl.firstChild);
+      accentEl.replaceWith(frag);
+      editor.normalize();
+      return;
+    }
+
+    // Wrap selection in accent span
+    const span = document.createElement('span');
+    span.className = 'accent';
+    try {
+      range.surroundContents(span);
+    } catch {
+      // Selection spans multiple nodes — extract and rewrap
+      span.appendChild(range.extractContents());
+      range.insertNode(span);
+      // Re-select the span contents to preserve visible selection
+      const newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+    }
   }
 
   function getValue() {
@@ -75,6 +84,8 @@ export function createRichText({ value = '', onChange, placeholder = '' } = {}) 
   function sanitize(html) {
     // Only allow <em>, <strong>, <span class="accent">
     return (html || '')
+      .replace(/<b>/gi, '<strong>').replace(/<\/b>/gi, '</strong>')
+      .replace(/<i>/gi, '<em>').replace(/<\/i>/gi, '</em>')
       .replace(/<(?!\/?(?:em|strong|span)[^>]*>)[^>]+>/gi, '') // strip other tags
       .replace(/<span(?!\s+class="accent")[^>]*>/gi, '<span class="accent">'); // normalize spans
   }
