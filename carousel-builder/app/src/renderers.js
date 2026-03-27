@@ -15,7 +15,7 @@ export const LAYOUT_NAMES = {
   cover:   { a: 'Ancorado', b: 'Editorial', c: 'Linha de corte' },
   dark:    { a: 'Stacked',  b: 'Nº fundo',  c: '2 colunas' },
   steps:   { a: 'Lista',    b: 'Numerado',  c: 'Ícones' },
-  overlay: { a: 'Foto topo', b: 'Full-bleed' },
+  overlay: { a: 'Foto topo', b: 'Full-bleed', c: 'Foto topo + fundo blur' },
   split:   { a: 'Padrão' },
   cta:     { a: 'Headline', c: 'Centrado' },
 };
@@ -350,19 +350,19 @@ export const RENDERERS = {
         : `<div style="width:100%;height:100%;background:linear-gradient(160deg,#2a3540,#1a2228);"></div>`;
       const headline = h(slide.headline_html || esc(slide.headline || ''));
       const body = h(slide.body_html || esc(slide.body || ''));
-      return `<div style="width:1080px;height:1350px;background:#000;display:flex;flex-direction:column;padding:14px 14px 0;">
-        <div style="height:680px;border-radius:18px;overflow:hidden;position:relative;flex-shrink:0;">
+      return `<div style="width:1080px;height:1350px;background:#000;display:flex;flex-direction:column;position:relative;">
+        <div style="height:680px;overflow:hidden;flex-shrink:0;">
           ${photo}
-          <div style="position:absolute;bottom:0;left:0;right:0;height:420px;background:linear-gradient(to top,#000 0%,rgba(0,0,0,.96) 10%,rgba(0,0,0,.88) 20%,rgba(0,0,0,.76) 32%,rgba(0,0,0,.6) 46%,rgba(0,0,0,.42) 60%,rgba(0,0,0,.24) 74%,rgba(0,0,0,.1) 87%,transparent 100%);"></div>
         </div>
-        <div style="flex:1;padding:32px 62px 60px;display:flex;flex-direction:column;">
+        <div style="position:absolute;left:0;right:0;top:296px;height:400px;background:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.5) 45%,rgba(0,0,0,.85) 72%,#000 100%);pointer-events:none;z-index:1;"></div>
+        <div style="flex:1;padding:32px 62px 60px;display:flex;flex-direction:column;position:relative;z-index:2;">
           <div style="${UI(t)}display:flex;align-items:center;gap:22px;font-size:22px;letter-spacing:.18em;color:#303030;text-transform:uppercase;margin-bottom:36px;">
             <span>${esc(slide.section_number)}</span>
             <div style="flex:1;height:1px;background:#1e1e1e;"></div>
             <span>${esc(t?.nav_right || 'SÉRIE')}</span>
           </div>
           <div style="${UI(t)}font-size:22px;letter-spacing:.18em;color:#333;text-transform:uppercase;margin-bottom:12px;">${esc(t?.nav_left || 'CATEGORIA')}</div>
-          <div style="${PF(t)}font-size:${hs(t,62)}px;font-weight:400;color:#fff;line-height:${lhH(t)};margin-bottom:12px;">${esc(slide.section_title)}</div>
+          <div style="${PF(t)}font-size:${hs(t,62)}px;font-weight:400;color:#fff;line-height:${lhH(t)};margin-bottom:24px;">${esc(slide.section_title)}</div>
           ${headline ? `<div style="${PF(t)}font-size:${hs(t,42)}px;font-weight:400;font-style:italic;color:#aaa;line-height:${lhH(t)};margin-bottom:40px;">${headline}</div>` : ''}
           <div style="${INT(t)}font-size:${bs(t,32)}px;color:#666;line-height:${lhB(t)};margin-bottom:auto;">${body}</div>
           ${footerBar(t)}
@@ -399,6 +399,37 @@ export const RENDERERS = {
             <span style="${UI(t)}font-size:22px;color:#1e1e1e;">${esc(brand_symbol)} ${esc(brand_name)}</span>
             <span style="${UI(t)}font-size:22px;letter-spacing:.14em;color:#1a1a1a;text-transform:uppercase;">${esc(brand_name)}</span>
           </div>
+        </div>
+      </div>`;
+    },
+
+    c(slide, img, t) {
+      const photoBg = slide.bg_blur_disabled ? '' : (img
+        ? `<img src="${img}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(18px);opacity:0.22;transform:scale(1.06);transform-origin:center;">`
+        : `<div style="position:absolute;inset:0;background:linear-gradient(160deg,#1a2228,#0d1418);"></div>`);
+      const photoFg = img
+        ? `<img src="${img}" style="width:100%;height:100%;object-fit:cover;${imgPos(slide)}">`
+        : `<div style="width:100%;height:100%;background:linear-gradient(160deg,#2a3540,#1a2228);"></div>`;
+      const headline = h(slide.headline_html || esc(slide.headline || ''));
+      const body = h(slide.body_html || esc(slide.body || ''));
+      return `<div style="width:1080px;height:1350px;background:#000;display:flex;flex-direction:column;padding:14px 14px 0;position:relative;">
+        <div style="position:absolute;inset:0;overflow:hidden;">
+          ${photoBg}
+        </div>
+        <div style="height:680px;border-radius:18px;overflow:hidden;flex-shrink:0;position:relative;z-index:1;">
+          ${photoFg}
+        </div>
+        <div style="flex:1;padding:32px 62px 60px;display:flex;flex-direction:column;position:relative;z-index:2;">
+          <div style="${UI(t)}display:flex;align-items:center;gap:22px;font-size:22px;letter-spacing:.18em;color:#303030;text-transform:uppercase;margin-bottom:36px;">
+            <span>${esc(slide.section_number)}</span>
+            <div style="flex:1;height:1px;background:#1e1e1e;"></div>
+            <span>${esc(t?.nav_right || 'SÉRIE')}</span>
+          </div>
+          <div style="${UI(t)}font-size:22px;letter-spacing:.18em;color:#444;text-transform:uppercase;margin-bottom:12px;">${esc(t?.nav_left || 'CATEGORIA')}</div>
+          <div style="${PF(t)}font-size:${hs(t,62)}px;font-weight:400;color:#fff;line-height:${lhH(t)};margin-bottom:24px;">${esc(slide.section_title)}</div>
+          ${headline ? `<div style="${PF(t)}font-size:${hs(t,42)}px;font-weight:400;font-style:italic;color:#aaa;line-height:${lhH(t)};margin-bottom:40px;">${headline}</div>` : ''}
+          <div style="${INT(t)}font-size:${bs(t,32)}px;color:#666;line-height:${lhB(t)};margin-bottom:auto;">${body}</div>
+          ${footerBar(t)}
         </div>
       </div>`;
     },

@@ -109,6 +109,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .btn-delete { background: transparent; border: none; color: #c44; font-size: 12px; cursor: pointer; padding: 4px 8px; transition: color .15s; }
 .btn-delete:hover { color: #e55; }
 .field-group { display: flex; flex-direction: column; gap: 6px; }
+.field-toggle-row { flex-direction: row; align-items: center; justify-content: space-between; }
+.toggle-switch { position: relative; display: inline-flex; cursor: pointer; }
+.toggle-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.toggle-track { width: 36px; height: 20px; background: var(--border); border-radius: 10px; transition: background .2s; display: flex; align-items: center; padding: 2px; }
+.toggle-thumb { width: 16px; height: 16px; background: #555; border-radius: 50%; transition: transform .2s, background .2s; }
+.toggle-switch input:checked + .toggle-track { background: rgba(204,255,0,.25); }
+.toggle-switch input:checked + .toggle-track .toggle-thumb { transform: translateX(16px); background: #ccff00; }
 .field-label { font-size: 12px; letter-spacing: .10em; text-transform: uppercase; color: var(--text-muted); }
 .field-input, .field-textarea {
   background: var(--bg-input); border: 1px solid var(--border); color: var(--text);

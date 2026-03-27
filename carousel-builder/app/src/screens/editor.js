@@ -403,6 +403,15 @@ function renderPanel() {
   const imgSrc = S.images[S.active];
   const canDel = S.slides.length > 1;
 
+  function fToggle(key, label, checked) {
+    return `<div class="field-group field-toggle-row">
+      <span class="field-label">${esc(label)}</span>
+      <label class="toggle-switch">
+        <input type="checkbox" data-key="${esc(key)}" data-type="boolean" ${checked ? 'checked' : ''}>
+        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      </label>
+    </div>`;
+  }
   function fText(key, label, val) {
     return `<div class="field-group"><div class="field-label">${esc(label)}</div>
       <input class="field-input" value="${esc(val || '')}" data-key="${esc(key)}"></div>`;
@@ -491,6 +500,9 @@ function renderPanel() {
     html += fText('section_title', 'Título', slide.section_title);
     html += `<div data-rich="headline_html"></div>`;
     html += `<div data-rich="body_html"></div>`;
+    if (slide.layout === 'c') {
+      html += fToggle('bg_blur_disabled', 'Desativar fundo desfocado', !!slide.bg_blur_disabled);
+    }
   }
   if (tpl === 'cta') {
     html += `<div data-rich="headline_html"></div>`;
@@ -549,7 +561,11 @@ function renderPanel() {
 
   // Wire up field inputs
   panel.querySelectorAll('input[data-key], textarea[data-key]').forEach(el => {
-    el.addEventListener('input', () => setField(el.dataset.key, el.value));
+    if (el.dataset.type === 'boolean') {
+      el.addEventListener('change', () => setField(el.dataset.key, el.checked));
+    } else {
+      el.addEventListener('input', () => setField(el.dataset.key, el.value));
+    }
   });
 
   const delBtn = panel.querySelector('#btn-delete-slide');
