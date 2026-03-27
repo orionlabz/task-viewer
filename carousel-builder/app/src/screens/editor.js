@@ -15,6 +15,32 @@ const SLIDE_DEFAULTS = {
   cta:     { template: 'cta',     layout: 'a', headline: '', headline_italic: '', body: '', cta_text: '', cta_word: '', cta_suffix: '' },
 };
 
+const TPL_LABELS = {
+  cover: 'Capa', split: 'Dividido', dark: 'Conteúdo',
+  steps: 'Etapas', overlay: 'Overlay', cta: 'CTA',
+};
+
+// Placeholder slide content for picker thumbnails
+const SAMPLE_SLIDES = {
+  cover:   { template: 'cover',   layout: 'a', headline_html: 'Título Principal', body_html: 'Subtítulo do slide' },
+  split:   { template: 'split',   layout: 'a', headline_html: 'Título', body_html: 'Texto do slide' },
+  dark:    { template: 'dark',    layout: 'a', section_number: '01', section_title: 'Seção', body_html: 'Conteúdo principal.', list_items: ['Item um', 'Item dois', 'Item três'], conclusion_html: 'Conclusão' },
+  steps:   { template: 'steps',   layout: 'a', section_title: null, steps: [{label:'1',text_html:'Primeiro'},{label:'2',text_html:'Segundo'},{label:'3',text_html:'Terceiro'}], call_to_action_html: 'Próximo passo' },
+  overlay: { template: 'overlay', layout: 'a', section_number: '02', section_title: 'Título', headline_html: 'Headline principal', body_html: 'Texto de apoio' },
+  cta:     { template: 'cta',     layout: 'a', headline_html: 'Chamada para ação', body_html: 'Descrição', cta_text: 'Comece agora', cta_word: 'Comece', cta_suffix: 'hoje' },
+};
+
+// Fields to migrate when changing template type
+const FIELD_TEMPLATES = {
+  headline_html:       ['cover', 'split', 'overlay', 'cta'],
+  body_html:           ['cover', 'split', 'dark', 'overlay', 'cta'],
+  section_number:      ['dark', 'overlay'],
+  section_title:       ['dark', 'steps', 'overlay'],
+  conclusion_html:     ['dark'],
+  call_to_action_html: ['steps'],
+  list_items:          ['dark'],
+};
+
 // ─── Legacy in-editor loading (unused after full-screen generating) ───────────
 let loadingTimers = [];
 
@@ -212,19 +238,123 @@ function renderPreview() {
   }
 
   iframe.srcdoc = slideDoc(S.active);
+}
 
-  const slide = S.slides[S.active];
-  const pillsEl = document.getElementById('layout-pills');
-  if (slide && pillsEl) {
-    const variants = LAYOUT_NAMES[slide.template] || {};
-    const currentLayout = slide.layout || 'a';
-    pillsEl.innerHTML = Object.entries(variants).map(([key, name]) =>
-      `<button class="pill${key === currentLayout ? ' active' : ''}" data-layout="${esc(key)}">${esc(name)}</button>`
-    ).join('');
-    pillsEl.querySelectorAll('.pill').forEach(btn => {
-      btn.onclick = () => changeLayout(btn.dataset.layout);
+// ─── Template + Layout Picker ─────────────────────────────────────────────────
+function buildTemplatePicker(currentSlide) {
+  const root = document.createElement('div');
+  root.className = 'tpl-picker';
+
+  // Header: current selection + toggle button
+  const hdr = document.createElement('div');
+  hdr.className = 'tpl-picker-header';
+
+  const curLabel = document.createElement('span');
+  curLabel.className = 'tpl-current-label';
+  const curLayout = currentSlide.layout || 'a';
+  curLabel.textContent = `${TPL_LABELS[currentSlide.template] || currentSlide.template} · ${LAYOUT_NAMES[currentSlide.template]?.[curLayout] || curLayout.toUpperCase()}`;
+
+  const toggle = document.createElement('button');
+  toggle.className = 'tpl-toggle';
+  toggle.textContent = '▾ Mudar';
+
+  hdr.appendChild(curLabel);
+  hdr.appendChild(toggle);
+  root.appendChild(hdr);
+
+  // Grid
+  const grid = document.createElement('div');
+  grid.className = 'tpl-grid-wrap';
+
+  Object.entries(LAYOUT_NAMES).forEach(([template, variants]) => {
+    const sec = document.createElement('div');
+    sec.className = 'tpl-section';
+
+    const secLbl = document.createElement('div');
+    secLbl.className = 'tpl-section-label';
+    secLbl.textContent = TPL_LABELS[template] || template;
+    sec.appendChild(secLbl);
+
+    const row = document.createElement('div');
+    row.className = 'tpl-row';
+
+    Object.entries(variants).forEach(([layout, name]) => {
+      const isActive = currentSlide.template === template && curLayout === layout;
+
+      const card = document.createElement('div');
+      card.className = 'tpl-card' + (isActive ? ' active' : '');
+      card.title = `${TPL_LABELS[template]} · ${name}`;
+
+      const thumb = document.createElement('div');
+      thumb.className = 'tpl-thumb';
+      const iframe = document.createElement('iframe');
+      const sample = { ...SAMPLE_SLIDES[template], layout };
+      iframe.srcdoc = `<!DOCTYPE html><html><head>${themeStyleBlock(S.theme)}</head><body style="margin:0;overflow:hidden;">${getRenderer(sample)(sample, null, S.theme)}</body></html>`;
+      thumb.appendChild(iframe);
+      card.appendChild(thumb);
+
+      const ltr = document.createElement('div');
+      ltr.className = 'tpl-card-ltr';
+      ltr.textContent = name;
+      card.appendChild(ltr);
+
+      card.onclick = () => {
+        changeTemplateLayout(template, layout);
+        // Update header label inline (renderAll will re-render panel if template changed)
+        curLabel.textContent = `${TPL_LABELS[template]} · ${name}`;
+        // Close grid
+        grid.classList.remove('open');
+        toggle.textContent = '▾ Mudar';
+      };
+
+      row.appendChild(card);
     });
+
+    sec.appendChild(row);
+    grid.appendChild(sec);
+  });
+
+  toggle.onclick = () => {
+    const open = grid.classList.toggle('open');
+    toggle.textContent = open ? '▴ Fechar' : '▾ Mudar';
+  };
+
+  root.appendChild(grid);
+  return root;
+}
+
+function changeTemplateLayout(template, layout) {
+  const slide = S.slides[S.active];
+  const prevLayout = slide.layout || 'a';
+
+  if (slide.template === template && prevLayout === layout) return;
+
+  if (slide.template === template) {
+    // Same template — just swap layout, no full re-render needed
+    slide.layout = layout;
+    refreshThumb(S.active);
+    renderPreview();
+    scheduleSave();
+    return;
   }
+
+  // Template change: build new slide with migrated fields
+  const next = { ...SLIDE_DEFAULTS[template], layout };
+  for (const [field, supported] of Object.entries(FIELD_TEMPLATES)) {
+    if (supported.includes(template) && slide[field] != null) {
+      next[field] = slide[field];
+    }
+  }
+  if (slide.img_position) next.img_position = slide.img_position;
+  S.slides[S.active] = next;
+
+  // Drop image if new template doesn't support it
+  if (!['cover', 'split', 'overlay'].includes(template)) {
+    delete S.images[S.active];
+  }
+
+  renderAll();
+  scheduleSave();
 }
 
 function renderPanel() {
@@ -248,9 +378,10 @@ function renderPanel() {
   }
 
   let html = `<div class="panel-header">
-    <div class="panel-title">Slide ${S.active + 1} · ${esc(tpl)}</div>
+    <div class="panel-title">Slide ${S.active + 1}</div>
     ${canDel ? '<button class="btn-delete" id="btn-delete-slide">Excluir</button>' : ''}
-  </div>`;
+  </div>
+  <div id="tpl-picker-slot"></div>`;
 
   if (hasImg) {
     html += `<div class="field-group"><div class="field-label">Imagem</div>
@@ -339,6 +470,9 @@ function renderPanel() {
   </div>`;
 
   panel.innerHTML = html;
+
+  // Mount template picker
+  panel.querySelector('#tpl-picker-slot')?.replaceWith(buildTemplatePicker(slide));
 
   // ── Mount rich-text editors over placeholder divs ─────────────────────────
   const onUpdate = () => { refreshThumb(S.active); renderPreview(); scheduleSave(); };
@@ -740,14 +874,6 @@ function addSlide() {
   scheduleSave();
 }
 
-function changeLayout(layout) {
-  if (!S.slides[S.active]) return;
-  S.slides[S.active].layout = layout;
-  refreshThumb(S.active);
-  renderPreview();
-  renderPanel();
-  scheduleSave();
-}
 
 function uploadImg(event) {
   const file = event.target.files[0];
@@ -839,7 +965,6 @@ export function mountEditor() {
             </div>
           </div>
           <div id="preview-wrap" class="preview-frame-wrap"></div>
-          <div id="layout-pills" class="template-pills"></div>
         </div>
         <div class="edit-panel" id="edit-panel"></div>
       </div>

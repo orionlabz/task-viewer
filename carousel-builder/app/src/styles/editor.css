@@ -111,5 +111,23 @@
 }
 .btn-adjust-img:hover { border-color: #555; color: var(--text); }
 
+/* ── Template + Layout Picker ────────────────────────────────────────────── */
+.tpl-picker { display: flex; flex-direction: column; gap: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); margin-bottom: 2px; }
+.tpl-picker-header { display: flex; align-items: center; justify-content: space-between; }
+.tpl-current-label { font-size: 12px; color: var(--text); font-weight: 500; }
+.tpl-toggle { background: transparent; border: 1px solid var(--border); color: var(--text-muted); border-radius: 4px; padding: 2px 7px; font-size: 10px; cursor: pointer; letter-spacing: .04em; transition: all .12s; }
+.tpl-toggle:hover { border-color: #555; color: var(--text); }
+.tpl-grid-wrap { display: none; flex-direction: column; gap: 10px; }
+.tpl-grid-wrap.open { display: flex; }
+.tpl-section { display: flex; flex-direction: column; gap: 5px; }
+.tpl-section-label { font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-dim); }
+.tpl-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.tpl-card { cursor: pointer; border: 1.5px solid var(--border); border-radius: 4px; overflow: hidden; transition: border-color .12s; flex-shrink: 0; }
+.tpl-card:hover { border-color: #555; }
+.tpl-card.active { border-color: #fff; }
+.tpl-thumb { width: 72px; height: 90px; overflow: hidden; background: #111; }
+.tpl-thumb iframe { width: 1080px; height: 1350px; transform-origin: top left; transform: scale(0.0667); pointer-events: none; border: none; display: block; }
+.tpl-card-ltr { font-size: 9px; text-align: center; color: var(--text-muted); padding: 2px 0 1px; background: var(--bg-input); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 72px; }
+
 /* ── Export buttons ──────────────────────────────────────────────────────── */
 .header-actions { display: flex; align-items: center; gap: 8px; }
