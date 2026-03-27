@@ -23,6 +23,13 @@ export const LAYOUT_NAMES = {
 const PF = (t) => `font-family:'${t?.font_display || 'Playfair Display'}',serif;`;
 const INT = (t) => `font-family:'${t?.font_body || 'Inter'}',sans-serif;`;
 
+function imgPos(slide) {
+  const p = slide.img_position;
+  if (!p) return '';
+  const x = p.x ?? 50, y = p.y ?? 50, s = p.scale ?? 1;
+  return `object-position:${x}% ${y}%;transform:scale(${s});transform-origin:${x}% ${y}%;`;
+}
+
 function navBar(t) {
   const nav_left  = t?.nav_left  || 'CATEGORIA';
   const nav_right = t?.nav_right || 'SÉRIE';
@@ -46,7 +53,7 @@ export const RENDERERS = {
   cover: {
     a(slide, img, t) {
       const bg = img
-        ? `<div style="position:absolute;inset:0;"><img src="${img}" style="width:100%;height:100%;object-fit:cover;filter:saturate(0.6);"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.97) 0%,rgba(0,0,0,.6) 42%,transparent 72%);"></div></div>`
+        ? `<div style="position:absolute;inset:0;"><img src="${img}" style="width:100%;height:100%;object-fit:cover;${imgPos(slide)}filter:saturate(0.6);"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.97) 0%,rgba(0,0,0,.6) 42%,transparent 72%);"></div></div>`
         : `<div style="position:absolute;inset:0;background:linear-gradient(160deg,#2a3540,#1a2228);"></div>`;
       const brand_symbol = t?.brand_symbol || '⬥';
       const brand_name   = t?.brand_name   || 'Marca';
@@ -67,7 +74,7 @@ export const RENDERERS = {
 
     b(slide, img, t) {
       const bg = img
-        ? `<div style="position:absolute;inset:0;"><img src="${img}" style="width:100%;height:100%;object-fit:cover;filter:saturate(0.6);"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.97) 0%,rgba(0,0,0,.6) 42%,transparent 72%);"></div></div>`
+        ? `<div style="position:absolute;inset:0;"><img src="${img}" style="width:100%;height:100%;object-fit:cover;${imgPos(slide)}filter:saturate(0.6);"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.97) 0%,rgba(0,0,0,.6) 42%,transparent 72%);"></div></div>`
         : `<div style="position:absolute;inset:0;background:linear-gradient(160deg,#2a3540,#1a2228);"></div>`;
       const brand_symbol = t?.brand_symbol || '⬥';
       const brand_name   = t?.brand_name   || 'Marca';
@@ -94,7 +101,7 @@ export const RENDERERS = {
 
     c(slide, img, t) {
       const bg = img
-        ? `<div style="position:absolute;inset:0;"><img src="${img}" style="width:100%;height:100%;object-fit:cover;filter:saturate(0.6);"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.97) 0%,rgba(0,0,0,.7) 55%,rgba(0,0,0,.3) 100%);"></div></div>`
+        ? `<div style="position:absolute;inset:0;"><img src="${img}" style="width:100%;height:100%;object-fit:cover;${imgPos(slide)}filter:saturate(0.6);"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.97) 0%,rgba(0,0,0,.7) 55%,rgba(0,0,0,.3) 100%);"></div></div>`
         : `<div style="position:absolute;inset:0;background:#050505;"></div>`;
       const brand_symbol = t?.brand_symbol || '⬥';
       const brand_name   = t?.brand_name   || 'Marca';
@@ -127,7 +134,7 @@ export const RENDERERS = {
   split: {
     a(slide, img, t) {
       const col = img
-        ? `<img src="${img}" style="width:100%;height:100%;object-fit:cover;filter:grayscale(90%) contrast(1.05);">`
+        ? `<img src="${img}" style="width:100%;height:100%;object-fit:cover;${imgPos(slide)}filter:grayscale(90%) contrast(1.05);">`
         : `<div style="width:100%;height:100%;background:linear-gradient(160deg,#2a3540,#1a2228);"></div>`;
       const headline = h(slide.headline_html || (slide.headline ? esc(slide.headline) + (slide.headline_italic ? ' <em>' + esc(slide.headline_italic) + '</em>' : '') : ''));
       const body = h(slide.body_html || esc(slide.body || ''));
@@ -332,7 +339,7 @@ export const RENDERERS = {
   overlay: {
     a(slide, img, t) {
       const photo = img
-        ? `<img src="${img}" style="width:100%;height:100%;object-fit:cover;">`
+        ? `<img src="${img}" style="width:100%;height:100%;object-fit:cover;${imgPos(slide)}">`
         : `<div style="width:100%;height:100%;background:linear-gradient(160deg,#2a3540,#1a2228);"></div>`;
       const body = h(slide.body_html || esc(slide.body || ''));
       return `<div style="width:1080px;height:1350px;background:#000;display:flex;flex-direction:column;padding:14px 14px 0;">
@@ -353,7 +360,7 @@ export const RENDERERS = {
 
     b(slide, img, t) {
       const photo = img
-        ? `<img src="${img}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`
+        ? `<img src="${img}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;${imgPos(slide)}">`
         : `<div style="position:absolute;inset:0;background:linear-gradient(160deg,#2a3540,#1a2228);"></div>`;
       const brand_symbol = t?.brand_symbol || '⬥';
       const brand_name   = t?.brand_name   || 'Marca';

@@ -254,6 +254,17 @@ function renderPanel() {
            </div>`
       }
     </div>`;
+    if (imgSrc) {
+      const px = slide.img_position?.x ?? 50;
+      const py = slide.img_position?.y ?? 50;
+      const ps = Math.round((slide.img_position?.scale ?? 1) * 100);
+      html += `<div class="field-group">
+        <div class="field-label">Posição &amp; Zoom</div>
+        <div class="img-pos-row"><span class="img-pos-lbl">H</span><input type="range" class="img-pos-slider" data-img-pos="x" min="0" max="100" value="${px}"><span class="img-pos-val" id="img-pos-x-val">${px}%</span></div>
+        <div class="img-pos-row"><span class="img-pos-lbl">V</span><input type="range" class="img-pos-slider" data-img-pos="y" min="0" max="100" value="${py}"><span class="img-pos-val" id="img-pos-y-val">${py}%</span></div>
+        <div class="img-pos-row"><span class="img-pos-lbl">Zoom</span><input type="range" class="img-pos-slider" data-img-pos="scale" min="100" max="300" step="5" value="${ps}"><span class="img-pos-val" id="img-pos-s-val">${ps}%</span></div>
+      </div>`;
+    }
   }
 
   if (tpl === 'cover' || tpl === 'split') {
@@ -370,6 +381,26 @@ function renderPanel() {
 
   const inpImg = panel.querySelector('#inp-img');
   if (inpImg) inpImg.onchange = (e) => uploadImg(e);
+
+  panel.querySelectorAll('.img-pos-slider').forEach(el => {
+    el.addEventListener('input', () => {
+      const sl = S.slides[S.active];
+      if (!sl.img_position) sl.img_position = { x: 50, y: 50, scale: 1.0 };
+      const key = el.dataset.imgPos;
+      if (key === 'scale') {
+        sl.img_position.scale = Number(el.value) / 100;
+        const v = document.getElementById('img-pos-s-val');
+        if (v) v.textContent = el.value + '%';
+      } else {
+        sl.img_position[key] = Number(el.value);
+        const v = document.getElementById(`img-pos-${key}-val`);
+        if (v) v.textContent = el.value + '%';
+      }
+      refreshThumb(S.active);
+      renderPreview();
+      scheduleSave();
+    });
+  });
 
   // List items
   panel.querySelectorAll('input[data-list-idx]').forEach(el => {
@@ -642,10 +673,10 @@ async function doRefine() {
   try {
     const refined = await api.refine(S.slides[S.active], instr);
     const prevLayout = S.slides[S.active].layout;
+    const prevImgPos = S.slides[S.active].img_position;
     S.slides[S.active] = refined;
-    if (prevLayout && !S.slides[S.active].layout) {
-      S.slides[S.active].layout = prevLayout;
-    }
+    if (prevLayout && !S.slides[S.active].layout) S.slides[S.active].layout = prevLayout;
+    if (prevImgPos) S.slides[S.active].img_position = prevImgPos;
     renderAll();
     scheduleSave();
   } catch (e) {
