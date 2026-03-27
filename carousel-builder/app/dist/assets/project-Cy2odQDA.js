@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/editor-B0nRkM1Z.js","assets/index-CTG8P1Fn.js","assets/index-Scg0-m5n.css","assets/theme-fxemBM4G.js","assets/renderers-CwWWVjzg.js"])))=>i.map(i=>d[i]);
-import{S as o,n,_ as s,a as r}from"./index-CTG8P1Fn.js";function p(){var e,a;document.getElementById("app").innerHTML=`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/editor-atfD4Oj2.js","assets/index-C91zRnbl.js","assets/index-Scg0-m5n.css","assets/theme-fxemBM4G.js","assets/renderers-CwWWVjzg.js"])))=>i.map(i=>d[i]);
+import{S as o,n,_ as s,a as r}from"./index-C91zRnbl.js";function p(){var e,a;document.getElementById("app").innerHTML=`
     <div class="screen-project">
       <header class="app-header">
         <button class="btn-text" id="btn-back">← Projetos</button>
@@ -26,4 +26,4 @@ import{S as o,n,_ as s,a as r}from"./index-CTG8P1Fn.js";function p(){var e,a;doc
         <button class="btn-text btn-open-carousel" data-id="${t.id}">Editar →</button>
         <button class="btn-icon btn-delete-carousel" data-id="${t.id}" title="Excluir">✕</button>
       </div>
-    </div>`).join(""),a.querySelectorAll(".btn-open-carousel").forEach(t=>t.onclick=()=>n("editor",{projectId:o.projectId,carouselId:Number(t.dataset.id)})),a.querySelectorAll(".btn-delete-carousel").forEach(t=>t.onclick=()=>d(Number(t.dataset.id)))}async function i(){const{showNewCarouselModal:e}=await s(async()=>{const{showNewCarouselModal:a}=await import("./editor-B0nRkM1Z.js");return{showNewCarouselModal:a}},__vite__mapDeps([0,1,2,3,4]));e()}async function d(e){confirm("Excluir este carrossel?")&&(await r.carousels.delete(e),c())}function l(e){return String(e).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}function u(e){return new Date(e).toLocaleDateString("pt-BR",{day:"2-digit",month:"short",year:"numeric"})}function b(){}export{p as mountProject,b as unmountProject};
+    </div>`).join(""),a.querySelectorAll(".btn-open-carousel").forEach(t=>t.onclick=()=>n("editor",{projectId:o.projectId,carouselId:Number(t.dataset.id)})),a.querySelectorAll(".btn-delete-carousel").forEach(t=>t.onclick=()=>d(Number(t.dataset.id)))}async function i(){const{showNewCarouselModal:e}=await s(async()=>{const{showNewCarouselModal:a}=await import("./editor-atfD4Oj2.js");return{showNewCarouselModal:a}},__vite__mapDeps([0,1,2,3,4]));e()}async function d(e){confirm("Excluir este carrossel?")&&(await r.carousels.delete(e),c())}function l(e){return String(e).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}function u(e){return new Date(e).toLocaleDateString("pt-BR",{day:"2-digit",month:"short",year:"numeric"})}function b(){}export{p as mountProject,b as unmountProject};

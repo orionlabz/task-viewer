@@ -97,11 +97,14 @@ export function createRichText({ value = '', onChange, placeholder = '' } = {}) 
   }
 
   function sanitize(html) {
-    // Only allow <em>, <strong>, <span class="accent">
+    // Only allow <em>, <strong>, <span class="accent">, <br>
     return (html || '')
+      .replace(/\n/g, '<br>') // pre-wrap mode inserts \n text nodes; normalize to <br>
       .replace(/<b>/gi, '<strong>').replace(/<\/b>/gi, '</strong>')
       .replace(/<i>/gi, '<em>').replace(/<\/i>/gi, '</em>')
-      .replace(/<(?!\/?(?:em|strong|span)[^>]*>)[^>]+>/gi, '') // strip other tags
+      // Normalize block elements (Chrome's Enter inserts <div>) to <br>
+      .replace(/<\/div>/gi, '<br>').replace(/<div[^>]*>/gi, '')
+      .replace(/<(?!\/?(?:em|strong|span|br)[^>]*>)[^>]+>/gi, '') // strip other tags
       .replace(/<span(?!\s+class="accent")[^>]*>/gi, '<span class="accent">'); // normalize spans
   }
 
@@ -115,6 +118,11 @@ export function createRichText({ value = '', onChange, placeholder = '' } = {}) 
   editor.addEventListener('input', () => onChange?.(getValue()));
 
   editor.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.execCommand('insertLineBreak');
+      onChange?.(getValue());
+    }
     if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); execCmd('bold'); }
     if ((e.ctrlKey || e.metaKey) && e.key === 'i') { e.preventDefault(); execCmd('italic'); }
   });
