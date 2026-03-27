@@ -1,4 +1,4 @@
-import{S as i,a as m,n as f,_ as h}from"./index-CvnXi3C-.js";function w({value:a="#000000",label:n="",onChange:o}={}){const r=document.createElement("div");r.className="color-picker-wrap",r.innerHTML=`
+import{S as i,a as m,n as f,_ as h}from"./index-CzwiutNf.js";function w({value:a="#000000",label:n="",onChange:o}={}){const r=document.createElement("div");r.className="color-picker-wrap",r.innerHTML=`
     <div class="color-picker-row">
       <label class="field-label" style="flex:1;">${y(n)}</label>
       <div class="color-swatch-wrap">

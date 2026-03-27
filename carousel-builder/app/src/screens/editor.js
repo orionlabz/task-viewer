@@ -3,6 +3,7 @@ import { api } from '../api.js';
 import { navigate } from '../router.js';
 import { themeStyleBlock } from '../theme.js';
 import { getRenderer, LAYOUT_NAMES } from '../renderers.js';
+import { fRich } from '../panel.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SLIDE_DEFAULTS = {
@@ -198,14 +199,13 @@ function renderPanel() {
   }
 
   if (tpl === 'cover' || tpl === 'split') {
-    html += fText('headline', 'Headline', slide.headline);
-    html += fText('headline_italic', 'Headline (itálico)', slide.headline_italic);
-    html += fArea('body', 'Corpo', slide.body);
+    html += `<div data-rich="headline_html"></div>`;
+    html += `<div data-rich="body_html"></div>`;
   }
   if (tpl === 'dark') {
     html += fText('section_number', 'Número da seção', slide.section_number);
     html += fText('section_title', 'Título da seção', slide.section_title);
-    html += fArea('body', 'Corpo', slide.body);
+    html += `<div data-rich="body_html"></div>`;
     html += `<div class="field-group"><div class="field-label">Itens da lista</div>
       <div class="list-items-wrap" id="list-items-wrap">
         ${(slide.list_items || []).map((item, i) =>
@@ -217,7 +217,7 @@ function renderPanel() {
       </div>
       ${(slide.list_items || []).length < 4 ? '<button class="btn-add-item" id="btn-add-list-item">+ Adicionar</button>' : ''}
     </div>`;
-    html += fArea('conclusion', 'Conclusão', slide.conclusion);
+    html += `<div data-rich="conclusion_html"></div>`;
   }
   if (tpl === 'steps') {
     html += fText('section_title', 'Título (opcional)', slide.section_title || '');
@@ -229,26 +229,24 @@ function renderPanel() {
               <input class="field-input step-label-input" value="${esc(step.label)}" placeholder="Etapa ${i + 1}" data-step-idx="${i}" data-step-field="label">
               <button class="btn-remove" data-step-remove="${i}">×</button>
             </div>
-            <input class="field-input" value="${esc(step.text)}" placeholder="Texto da etapa" data-step-idx="${i}" data-step-field="text">
+            <div data-rich="step_text_html_${i}"></div>
             ${slide.layout === 'c' ? renderIconPicker(i, (slide.steps[i] || {}).icon) : ''}
           </div>`
         ).join('')}
       </div>
       ${(slide.steps || []).length < 4 ? '<button class="btn-add-item" id="btn-add-step">+ Etapa</button>' : ''}
     </div>`;
-    html += fText('call_to_action', 'Chamada final', slide.call_to_action);
-    html += fText('call_to_action_italic', 'Chamada final (itálico)', slide.call_to_action_italic);
+    html += `<div data-rich="call_to_action_html"></div>`;
   }
   if (tpl === 'overlay') {
     html += fText('section_number', 'Número da seção', slide.section_number);
     html += fText('section_title', 'Título', slide.section_title);
-    html += fText('headline', 'Headline', slide.headline);
-    html += fArea('body', 'Corpo', slide.body);
+    html += `<div data-rich="headline_html"></div>`;
+    html += `<div data-rich="body_html"></div>`;
   }
   if (tpl === 'cta') {
-    html += fText('headline', 'Headline', slide.headline);
-    html += fText('headline_italic', 'Headline (itálico)', slide.headline_italic);
-    html += fArea('body', 'Corpo', slide.body);
+    html += `<div data-rich="headline_html"></div>`;
+    html += `<div data-rich="body_html"></div>`;
     html += fText('cta_text', 'Texto do CTA', slide.cta_text);
     html += fText('cta_word', 'Palavra em destaque', slide.cta_word);
     html += fText('cta_suffix', 'Sufixo do CTA', slide.cta_suffix);
@@ -266,6 +264,40 @@ function renderPanel() {
   </div>`;
 
   panel.innerHTML = html;
+
+  // ── Mount rich-text editors over placeholder divs ─────────────────────────
+  const onUpdate = () => { refreshThumb(S.active); renderPreview(); scheduleSave(); };
+
+  const RICH_LABELS = {
+    headline_html:       'Headline',
+    body_html:           'Corpo',
+    conclusion_html:     'Conclusão',
+    call_to_action_html: 'Chamada final',
+  };
+
+  panel.querySelectorAll('[data-rich]').forEach(placeholder => {
+    const key = placeholder.dataset.rich;
+
+    // Step text fields: data-rich="step_text_html_N"
+    const stepMatch = key.match(/^step_text_html_(\d+)$/);
+    if (stepMatch) {
+      const idx = Number(stepMatch[1]);
+      const step = slide.steps?.[idx];
+      if (!step) return;
+      // Ensure text_html exists — migrate from plain text if needed
+      if (!step.text_html && step.text) {
+        step.text_html = String(step.text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
+      const el = fRich(step, 'text_html', 'Texto da etapa', onUpdate);
+      placeholder.replaceWith(el);
+      return;
+    }
+
+    // Top-level fields
+    const label = RICH_LABELS[key] || key;
+    const el = fRich(slide, key, label, onUpdate);
+    placeholder.replaceWith(el);
+  });
 
   // Wire up field inputs
   panel.querySelectorAll('input[data-key], textarea[data-key]').forEach(el => {
