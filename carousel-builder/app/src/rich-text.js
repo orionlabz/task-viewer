@@ -43,29 +43,44 @@ export function createRichText({ value = '', onChange, placeholder = '' } = {}) 
     if (!sel.rangeCount || sel.isCollapsed) return;
     const range = sel.getRangeAt(0);
 
-    // Detect if the selection's common ancestor is inside an .accent span
+    // Case 1: selection is entirely inside a single .accent span
     const ancestor = range.commonAncestorContainer;
-    const accentEl = (ancestor.nodeType === 3 ? ancestor.parentElement : ancestor)
+    const directAccent = (ancestor.nodeType === 3 ? ancestor.parentElement : ancestor)
       ?.closest?.('.accent');
-    if (accentEl && editor.contains(accentEl)) {
-      // Unwrap the accent span
+    if (directAccent && editor.contains(directAccent)) {
       const frag = document.createDocumentFragment();
-      while (accentEl.firstChild) frag.appendChild(accentEl.firstChild);
-      accentEl.replaceWith(frag);
+      while (directAccent.firstChild) frag.appendChild(directAccent.firstChild);
+      directAccent.replaceWith(frag);
       editor.normalize();
       return;
     }
 
-    // Wrap selection in accent span
+    // Case 2: selection contains .accent spans — remove them all
+    const preview = range.cloneContents();
+    if (preview.querySelector('.accent')) {
+      const extracted = range.extractContents();
+      const tmp = document.createElement('div');
+      tmp.appendChild(extracted);
+      tmp.querySelectorAll('.accent').forEach(el => {
+        const nodes = [...el.childNodes];
+        el.replaceWith(...nodes);
+      });
+      // Re-insert cleaned content
+      const cleaned = document.createDocumentFragment();
+      while (tmp.firstChild) cleaned.appendChild(tmp.firstChild);
+      range.insertNode(cleaned);
+      editor.normalize();
+      return;
+    }
+
+    // Case 3: no accent — wrap selection in accent span
     const span = document.createElement('span');
     span.className = 'accent';
     try {
       range.surroundContents(span);
     } catch {
-      // Selection spans multiple nodes — extract and rewrap
       span.appendChild(range.extractContents());
       range.insertNode(span);
-      // Re-select the span contents to preserve visible selection
       const newRange = document.createRange();
       newRange.selectNodeContents(span);
       sel.removeAllRanges();

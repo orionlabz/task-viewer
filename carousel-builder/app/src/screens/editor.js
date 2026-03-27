@@ -783,12 +783,78 @@ async function exportPDF() {
 ${tsb(S.theme)}
 <style>
 @page { size: 1080px 1350px; margin: 0; }
+*, *::before, *::after { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 html, body { margin: 0; padding: 0; background: #000; }
 .sp { width: 1080px; height: 1350px; overflow: hidden; break-after: page; }
 </style></head><body>${slidesHTML}
 <script>document.fonts.ready.then(()=>window.print());<\/script>
 </body></html>`);
   win.document.close();
+}
+
+async function exportPNG() {
+  if (!window.html2canvas) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+      s.onload = res;
+      s.onerror = () => rej(new Error('Falha ao carregar html2canvas'));
+      document.head.appendChild(s);
+    }).catch(() => { alert('Não foi possível carregar o exportador. Verifique sua conexão.'); });
+    if (!window.html2canvas) return;
+  }
+
+  const { buildGoogleFontsUrl, defaultTheme } = await import('../theme.js');
+  const { getRenderer: gr } = await import('../renderers.js');
+  const theme = S.theme || defaultTheme();
+
+  // Ensure Google Fonts are loaded in the main document so html2canvas can use them
+  const fontUrl = buildGoogleFontsUrl(theme.font_display, theme.font_body, theme.font_ui);
+  if (!document.querySelector(`link[data-png-fonts]`)) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = fontUrl;
+    link.setAttribute('data-png-fonts', '1');
+    document.head.appendChild(link);
+    await document.fonts.ready;
+    // Extra buffer for @import chain to resolve
+    await new Promise(r => setTimeout(r, 800));
+  }
+
+  const cssVars = `--t-bg:${theme.color_bg||'#000'};--t-text:${theme.color_text||'#e8e8e8'};--t-emphasis:${theme.color_emphasis||'#CCFF00'};--t-secondary:${theme.color_secondary||'#666'};--t-detail:${theme.color_detail||'#2a2a2a'};--t-border:${theme.color_border||'#1e1e1e'};font-family:'${theme.font_body||'Inter'}',sans-serif;`;
+
+  for (let i = 0; i < S.slides.length; i++) {
+    const slide = S.slides[i];
+    const html = gr(slide)(slide, S.images[i] || null, theme);
+
+    const container = document.createElement('div');
+    container.style.cssText = `position:fixed;left:-9999px;top:0;width:1080px;height:1350px;overflow:hidden;z-index:-1;${cssVars}background:${theme.color_bg||'#000'};`;
+    container.innerHTML = html;
+    document.body.appendChild(container);
+
+    // Let images and fonts settle
+    await new Promise(r => setTimeout(r, 300));
+
+    const canvas = await window.html2canvas(container, {
+      width: 1080,
+      height: 1350,
+      scale: 1,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: theme.color_bg || '#000',
+      logging: false,
+    });
+
+    document.body.removeChild(container);
+
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = `slide-${String(i + 1).padStart(2, '0')}.png`;
+    a.click();
+
+    // Brief pause between downloads
+    await new Promise(r => setTimeout(r, 150));
+  }
 }
 
 // ─── Slide mutations ──────────────────────────────────────────────────────────
@@ -939,6 +1005,7 @@ export function mountEditor() {
         <button class="header-btn" id="btn-back">← Projetos</button>
         <div id="editor-topic" class="editor-topic"></div>
         <div class="header-actions">
+          <button class="header-btn" id="btn-export-png" title="Exportar como PNG (um arquivo por slide)">↓ PNG</button>
           <button class="header-btn" id="btn-export-pdf" title="Exportar como PDF">↓ PDF</button>
           <div id="saved-dot" class="saved-dot"></div>
         </div>
@@ -974,6 +1041,7 @@ export function mountEditor() {
     navigate('project', { projectId: S.projectId });
 
   document.getElementById('btn-export-pdf').onclick = exportPDF;
+  document.getElementById('btn-export-png').onclick = exportPNG;
 
   if (S.carousel) {
     document.getElementById('editor-topic').textContent = S.carousel.title || '';
