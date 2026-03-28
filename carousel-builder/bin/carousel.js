@@ -91,4 +91,10 @@ function cmdStatus() {
     console.log(`  Logs:   ${LOG_FILE}`);
   });
 }
-function cmdLogs() {}
+function cmdLogs() {
+  if (!existsSync(LOG_FILE)) {
+    console.log(`No log file yet. Run 'carousel start' first.`);
+    process.exit(1);
+  }
+  spawn('tail', ['-f', LOG_FILE], { stdio: 'inherit' });
+}
