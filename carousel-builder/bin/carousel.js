@@ -45,7 +45,10 @@ function cmdStart() {
   console.log(`carousel bridge started (PID ${child.pid}) — http://localhost:${PORT}`);
   console.log(`logs: ${LOG_FILE}`);
   setTimeout(() => {
-    spawn('open', [`http://localhost:${PORT}`], { detached: true, stdio: 'ignore' }).unref();
+    const opener = process.platform === 'darwin' ? 'open' : 'xdg-open';
+    const child = spawn(opener, [`http://localhost:${PORT}`], { detached: true, stdio: 'ignore' });
+    child.on('error', () => {}); // ignore if opener not available
+    child.unref();
   }, 800);
 }
 
