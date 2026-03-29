@@ -1,0 +1,8 @@
+{
+  "name": "task-viewer",
+  "description": "Real-time task visualization dashboard for Claude Code sessions with Superpowers plan tracking",
+  "version": "0.1.0",
+  "author": {
+    "name": "Paulo Jalowyj"
+  }
+}

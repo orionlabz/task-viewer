@@ -1,0 +1,8 @@
+{
+  "name": "carousel-builder",
+  "description": "Instagram carousel builder with AI generation, web editor, and CLI bridge management",
+  "version": "0.3.0",
+  "author": {
+    "name": "Paulo Jalowyj"
+  }
+}
