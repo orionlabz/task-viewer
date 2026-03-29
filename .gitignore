@@ -8,3 +8,4 @@ node_modules/
 .superpowers/
 task-viewer/.orphaned_at
 task-viewer/hooks/server/data/*.db
+carousel-builder/storage/*.db
