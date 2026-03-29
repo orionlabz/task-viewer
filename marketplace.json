@@ -1,0 +1,27 @@
+{
+  "name": "orionlabz",
+  "description": "Claude Code plugins by OrionLabz",
+  "owner": {
+    "name": "OrionLabz"
+  },
+  "plugins": [
+    {
+      "name": "task-viewer",
+      "description": "Real-time task visualization dashboard for Claude Code sessions with Superpowers plan tracking",
+      "version": "0.1.0",
+      "source": "./task-viewer",
+      "author": {
+        "name": "Paulo Jalowyj"
+      }
+    },
+    {
+      "name": "carousel-builder",
+      "description": "Instagram carousel builder with AI generation, web editor, and CLI bridge management",
+      "version": "0.2.0",
+      "source": "./carousel-builder",
+      "author": {
+        "name": "Paulo Jalowyj"
+      }
+    }
+  ]
+}
